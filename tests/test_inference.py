@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 inference = pytest.importorskip("src.inference", reason="src/inference.py not importable")
 
 EMOTIONS = ["Joy", "Sadness", "Anger", "Fear", "Anxiety", "Stress", "Surprise", "Neutral"]
-CANDIDATES = ["predict", "predict_emotion", "classify", "predict_text", "predict_proba"]
+CANDIDATES = ["predict"]
 
 
 def _find(names):

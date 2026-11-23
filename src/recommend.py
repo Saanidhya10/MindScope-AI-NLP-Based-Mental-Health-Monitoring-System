@@ -1,73 +1,27 @@
 """Rule-based, NON-DIAGNOSTIC recommendations and safety escalation (paper, Sec. 5.7).
 
-Rules are deliberately transparent rather than learned. Escalation depends on persistence and severity
-(see trends.detect_escalation), never on a single message. Wording never names a condition.
-``check_wording`` is used in tests/test_recommend.py to enforce that.
+Rules are deliberately transparent rather than learned. Escalation depends on persistence
+(see trends.escalation_flags), never on a single message, with one exception: ``check_crisis``
+surfaces helplines immediately when a message contains a crisis phrase, whatever the model predicts.
+Wording never names a condition; ``check_wording`` enforces that in tests/test_recommend.py.
+
+All user-facing copy (suggestions, support message, helplines, crisis phrases) lives in
+config.yaml -> recommend.
 """
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass, field
+
+import pandas as pd
 
 from src.utils import LABELS, NEGATIVE_LABELS, load_config
 
-SUGGESTIONS: dict[str, list[str]] = {
-    "Stress": [
-        "Try box breathing: breathe in for 4 seconds, hold for 4, out for 4, hold for 4. Repeat for a few minutes.",
-        "Pick just one small task to do next and set the rest aside for now.",
-        "Take a short break away from screens, even five minutes can help.",
-    ],
-    "Anxiety": [
-        "Try a grounding exercise: name 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste.",
-        "Spend a few minutes on slow, mindful breathing, noticing the air moving in and out.",
-        "Write down what is on your mind; seeing it on paper can make it feel more manageable.",
-    ],
-    "Sadness": [
-        "Consider reaching out to a friend or family member you trust, even with a short message.",
-        "Gentle activity, like a short walk outside, can lift your energy a little.",
-        "Be kind to yourself today; small, comforting routines count.",
-    ],
-    "Anger": [
-        "Give yourself a pause before responding, and take a few slow breaths.",
-        "Physical movement, like a brisk walk, can help release built-up tension.",
-        "Writing down what is frustrating you can help you sort out what matters most.",
-    ],
-    "Fear": [
-        "Take slow breaths with a long exhale to help your body settle.",
-        "Name what is worrying you, then note one small step you could take or one person you could talk to.",
-        "Remind yourself of a time you handled something difficult.",
-    ],
-}
-POSITIVE_NOTE = "It sounds like things are going reasonably well lately. Keep doing what supports you."
-ESCALATION_TEXT = (
-    "Over the past several days your messages have shown a sustained pattern of low or stressful mood. "
-    "This tool cannot assess your health, but a qualified mental-health professional can offer proper support. "
-    "Please consider reaching out to one, or to someone you trust, soon. You do not have to handle this alone."
-)
-
 # Terms that must never appear in user-facing text (no diagnosis, no clinical labels, no alarmism).
 BANNED_PATTERNS = [
-    r"\bdepress(ed|ion|ive)\b", r"\bdisorder\b", r"\bdiagnos(e|ed|is)\b(?! or)", r"\byou (have|are suffering)\b",
-    r"\bsuffer(ing)? from\b", r"\bmentally ill\b", r"\bsuicid", r"\bcrisis\b", r"\bdanger(ous)?\b(?! right)",
+    r"\bdepress(ed|ion|ive)\b", r"\bdisorder\b", r"(?<!cannot )\bdiagnos(e|ed|is)\b", r"\byou (have|are suffering)\b",
+    r"\bsuffer(ing)? from\b", r"\bmentally ill\b", r"\bsuicid", r"\bcrisis\b", r"\bdanger(ous)?\b",
 ]
-
-
-@dataclass
-class Recommendation:
-    level: str                      # "none" | "supportive" | "escalation"
-    headline: str
-    suggestions: list[str] = field(default_factory=list)
-    helplines: list[dict] = field(default_factory=list)
-    emergency_note: str = ""
-    disclaimer: str = ""
-    emotion: str | None = None
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-    def user_text(self) -> str:
-        """All user-facing text except the disclaimer/emergency note (those intentionally mention 'diagnose')."""
-        return " ".join([self.headline, *self.suggestions])
+HELPLINE_NOTE = "If things feel like too much, a qualified professional or a helpline such as Tele-MANAS (14416) can help."
 
 
 def check_wording(text: str) -> list[str]:
@@ -75,73 +29,84 @@ def check_wording(text: str) -> list[str]:
     return [p for p in BANNED_PATTERNS if re.search(p, text, flags=re.I)]
 
 
-def get_helplines(cfg: dict) -> list[dict]:
-    rc = cfg.get("recommend", {})
-    hl = rc.get("helplines", [])
-    if isinstance(hl, list):
-        return hl
-    if isinstance(hl, dict):
-        return list(hl.get(rc.get("region", "default"), hl.get("default", [])))
-    return [{"name": "Tele-MANAS", "number": "14416"}]
+def get_helplines(cfg: dict | None = None) -> list[dict]:
+    cfg = cfg or load_config()
+    return list(cfg.get("recommend", {}).get("helplines", [])) or [{"name": "Tele-MANAS", "number": "14416"}]
 
 
-def get_suggestion(dominant_emotion: str) -> str:
-    if dominant_emotion not in LABELS and dominant_emotion not in SUGGESTIONS:
-        raise ValueError(f"Unknown emotion: {dominant_emotion}")
-    suggs = SUGGESTIONS.get(dominant_emotion, [POSITIVE_NOTE])
-    return " ".join(suggs)
+def suggestion_for(emotion: str, cfg: dict | None = None) -> dict:
+    """{'title', 'text'} for one of the 8 emotions."""
+    if emotion not in LABELS:
+        raise ValueError(f"Unknown emotion: {emotion}")
+    cfg = cfg or load_config()
+    return dict(cfg["recommend"]["suggestions"][emotion.lower()])
 
 
-suggest = get_suggestion
-get_recommendation = get_suggestion
-recommend_for_emotion = get_suggestion
+def get_suggestion(emotion: str, cfg: dict | None = None) -> str:
+    s = suggestion_for(emotion, cfg)
+    return f"{s['title']}. {s['text']}"
+
+
+def check_crisis(text: str, cfg: dict | None = None) -> bool:
+    """True when the text contains a phrase that should surface helplines straight away."""
+    if not text:
+        return False
+    cfg = cfg or load_config()
+    lower = " ".join(text.lower().split())
+    return any(p in lower for p in cfg["recommend"].get("crisis_phrases", []))
 
 
 def should_escalate(scores, tau: float = 0.55, k: int = 3, alpha: float = 0.3) -> bool:
-    if not scores:
+    """Plain-list version of the escalation rule: EMA of ``scores`` above tau for >= k consecutive steps."""
+    if not len(scores):
         return False
-    # calculate EMA
-    s = [scores[0]]
-    for x in scores[1:]:
-        s.append(alpha * x + (1.0 - alpha) * s[-1])
-    run = 0
-    for val in s:
-        run = run + 1 if val > tau else 0
+    run, s = 0, scores[0]
+    for i, x in enumerate(scores):
+        s = x if i == 0 else alpha * x + (1.0 - alpha) * s
+        run = run + 1 if s > tau else 0
         if run >= k:
             return True
     return False
 
 
-check_escalation = should_escalate
-needs_escalation = should_escalate
-escalate = should_escalate
-evaluate_escalation = should_escalate
+def assess(daily: pd.DataFrame, baseline: dict, cfg: dict | None = None) -> dict:
+    """One status for the dashboard, so the page never shows two conflicting verdicts.
 
-
-def recommend(dominant_emotion: str | None = None, escalation: dict | None = None, neg_score: float | None = None,
-              cfg: dict | None = None) -> Recommendation:
+    Order of precedence: sustained distress (escalation) > a heavy day versus the personal baseline >
+    a negative emotion that keeps coming up > a lighter day than usual > steady.
+    ``daily`` comes from trends.daily_frame (needs dominant_emotion, neg_score, smoothed, high_run).
+    Returns level ('support' | 'watch' | 'steady'), headline, detail, suggestion {title, text},
+    helplines (only for 'support') and the recent dominant emotion.
+    """
     cfg = cfg or load_config()
-    rc = cfg.get("recommend", {})
-    tc = cfg.get("trends", {})
-    disclaimer = rc.get("disclaimer") or cfg.get("project", {}).get("disclaimer", "")
-    emergency_note = rc.get("emergency_note", "If you are in immediate danger, please contact local emergency services.")
-    common = {"disclaimer": disclaimer, "emotion": dominant_emotion}
+    tau, k = cfg["trends"]["tau"], cfg["trends"]["k"]
+    last = daily.iloc[-1]
+    dom = str(last["dominant_emotion"])
+    latest = float(last["neg_score"])
+    std = baseline["std"] if baseline["std"] > 0.02 else 0.10
+    z = (latest - baseline["mean"]) / std
+    out = {"emotion": dom, "suggestion": suggestion_for(dom, cfg), "helplines": [], "z": z}
 
-    if escalation and escalation.get("triggered"):
-        return Recommendation(
-            level="escalation", headline=ESCALATION_TEXT,
-            suggestions=SUGGESTIONS.get(dominant_emotion, SUGGESTIONS["Stress"])[:2],
-            helplines=get_helplines(cfg), emergency_note=emergency_note, **common)
-
-    if dominant_emotion in NEGATIVE_LABELS and (neg_score is None or neg_score >= tc.get("supportive_min_score", 0.35)):
-        return Recommendation(
-            level="supportive",
-            headline=f"Lately your messages lean towards {dominant_emotion.lower()}. Here are a few things that might help:",
-            suggestions=SUGGESTIONS[dominant_emotion], **common)
-
-    return Recommendation(level="none", headline=POSITIVE_NOTE, **common)
-
-
-def recommend_from_summary(summary: dict, cfg: dict | None = None) -> Recommendation:
-    """Convenience wrapper around ``trends.mood_summary`` output."""
-    return recommend(summary.get("latest_dominant"), summary.get("escalation"), summary.get("latest_neg_score"), cfg)
+    run = int(last["high_run"])
+    if run >= k:
+        return {**out, "level": "support",
+                "headline": f"Difficult feelings have stayed high for {run} check-in days in a row.",
+                "detail": " ".join(cfg["recommend"]["support_message"].split()),
+                "suggestion": suggestion_for(dom if dom in NEGATIVE_LABELS else "Stress", cfg),
+                "helplines": get_helplines(cfg)}
+    if z >= 1.75 and latest > 0.48:
+        return {**out, "level": "watch",
+                "headline": "Today's entries are heavier than usual for you.",
+                "detail": f"Difficult feelings made up {latest:.0%} of today, against your usual {baseline['mean']:.0%}.",
+                "suggestion": suggestion_for(dom if dom in NEGATIVE_LABELS else "Stress", cfg)}
+    if dom in NEGATIVE_LABELS and float(last["smoothed"]) > 0.65 * tau:
+        return {**out, "level": "watch",
+                "headline": f"{dom} has been coming up a lot lately.",
+                "detail": "It hasn't been sustained long enough to be a pattern yet. Keep writing and see how it moves."}
+    if z <= -1.3 and latest < 0.30:
+        return {**out, "level": "steady",
+                "headline": "Today feels lighter than usual for you.",
+                "detail": f"Difficult feelings made up {latest:.0%} of today, below your usual {baseline['mean']:.0%}."}
+    return {**out, "level": "steady",
+            "headline": "Your recent entries are close to your usual.",
+            "detail": f"Difficult feelings are around {latest:.0%} of today, near your usual {baseline['mean']:.0%}."}

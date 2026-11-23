@@ -83,7 +83,7 @@ class MoodDatabase:
         if not self.has_consent(user_id):
             raise PermissionError(f"User '{user_id}' has not granted consent; nothing was stored.")
         probs = np.asarray(probs, dtype=float).ravel()
-        ts = pd.Timestamp(timestamp or datetime.now()).isoformat()
+        ts = pd.Timestamp(timestamp or datetime.now()).isoformat(timespec="seconds")
         with self._conn() as c:
             c.execute(
                 "INSERT INTO predictions (user_id, timestamp, emotion, confidence, negative_score, probs, text) "

@@ -184,6 +184,47 @@ models:
   best_model_for_experiments: distilbert
   deployed_model: distilbert
 
+# Seeds used by `--seeds` defaults in src/train_bilstm.py and src/train_transformer.py
+seeds: [42]
+
+# -----------------------------------------------------------------------------
+# Flat sections read directly by src/train_bilstm.py and src/train_transformer.py
+# (values mirror models.bilstm / models.transformers above - keep them in sync)
+# -----------------------------------------------------------------------------
+bilstm:
+  embedding: glove                     # glove | word2vec | random
+  glove_path: data/raw/glove.6B.100d.txt   # download from nlp.stanford.edu/projects/glove; falls back to random init if missing
+  embedding_dim: 100
+  freeze_embeddings: false
+  hidden: 128
+  dropout: 0.3
+  max_len: 64
+  vocab: { min_freq: 2, max_size: 30000 }
+  batch_size: 64
+  epochs: 10
+  lr: 0.001
+  patience: 2
+  grid:                                # every combo needs all four keys
+    hidden: [128, 256]
+    dropout: [0.3]
+    lr: [0.001, 0.0005]
+    embedding: [glove]
+
+transformer:
+  models:
+    distilbert: distilbert-base-uncased
+    roberta: roberta-base
+  max_len: 64
+  epochs: 3
+  batch_size: 32
+  lr: 0.00002
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  early_stopping_patience: 2
+  grid:
+    lr: [0.00002, 0.00003]
+    batch_size: [16, 32]
+
 # -----------------------------------------------------------------------------
 # Class-imbalance experiments (the research core)
 # RULE: mitigation touches the TRAIN split only. Val/test stay untouched.
@@ -222,124 +263,87 @@ augmentation:
 # Temporal aggregation (daily / weekly / monthly mood trends)
 # -----------------------------------------------------------------------------
 trends:
-  min_confidence: 0.40                 # ignore very uncertain predictions
-  # Sentiment score in [-1, +1] per emotion; multiplied by prediction confidence
-  sentiment_scores:
-    joy: 1.0
-    surprise: 0.2
-    neutral: 0.0
-    sadness: -0.7
-    anger: -0.8
-    fear: -0.7
-    anxiety: -0.8
-    stress: -0.8
-  windows:
-    daily:   { freq: D, rolling_days: 1 }
-    weekly:  { freq: W, rolling_days: 7 }
-    monthly: { freq: M, rolling_days: 30 }
-  dominant_emotion_method: mode        # mode | confidence_weighted
+  # Smoothing + escalation (read by src/trends.py and the app)
+  alpha: 0.3                           # EMA weight of the newest day
+  tau: 0.55                            # smoothed negative-affect score that counts as "high"
+  k: 3                                 # consecutive high check-in days before suggesting support
+  max_gap_days: 3                      # a gap longer than this between check-ins resets the run
+  window_days: 14                      # escalation only looks at the most recent window
   # No real per-user timelines exist -> build SIMULATED ones (state this in the report)
   simulation:
-    seed: 42
-    messages_per_day: [2, 5]           # min, max
-    scenarios:
-      - name: drift_joy_to_sadness_stress
-        days: 21
-        phases:
-          - { days: 7, mix: { joy: 0.6, neutral: 0.3, surprise: 0.1 } }
-          - { days: 7, mix: { neutral: 0.4, sadness: 0.3, stress: 0.2, joy: 0.1 } }
-          - { days: 7, mix: { sadness: 0.4, stress: 0.35, anxiety: 0.15, neutral: 0.1 } }
-      - name: stable_positive
-        days: 21
-        phases:
-          - { days: 21, mix: { joy: 0.6, neutral: 0.3, surprise: 0.1 } }
-      - name: recovery
-        days: 21
-        phases:
-          - { days: 7, mix: { sadness: 0.45, anxiety: 0.25, stress: 0.2, neutral: 0.1 } }
-          - { days: 7, mix: { neutral: 0.45, sadness: 0.25, joy: 0.2, stress: 0.1 } }
-          - { days: 7, mix: { joy: 0.5, neutral: 0.4, surprise: 0.1 } }
-      - name: persistent_anxiety
-        days: 21
-        phases:
-          - { days: 21, mix: { anxiety: 0.35, fear: 0.2, stress: 0.25, neutral: 0.2 } }
-  trend_quality:
-    metric: agreement                  # share of days where aggregated dominant emotion's valence matches the scripted phase
-    valence_groups:
-      positive: [joy, surprise]
-      neutral: [neutral]
-      negative: [sadness, anger, fear, anxiety, stress]
+    start_date: "2025-01-01"
+    days: 21
+    msgs_per_day: [2, 5]               # min, max
+    scenarios: [stable_positive, drift_to_stress, isolated_negative, sustained_negative, recovery]
 
 # -----------------------------------------------------------------------------
-# Recommendation + safety escalation (rule-based, non-diagnostic)
+# Recommendation + safety (rule-based, non-diagnostic). Escalation thresholds live under trends.
 # -----------------------------------------------------------------------------
 recommend:
-  # Escalate when the share of negative-emotion messages in a rolling window
-  # exceeds the threshold. TUNE AND JUSTIFY this in the report.
-  escalation:
-    window_days: 7                     # roadmap suggests 7-14
-    alt_window_days: 14
-    negative_share_threshold: 0.60
-    min_messages_in_window: 5          # avoid escalating on a handful of messages
-    persistence_days: 3                # negative dominant emotion for >= N consecutive days
   suggestions:
     stress:
-      title: A moment to breathe
-      text: "Try a slow breathing exercise: breathe in for 4 seconds, hold for 4, breathe out for 6. Repeat for a few minutes."
+      title: Slow your breathing
+      text: "Breathe in for 4 seconds, hold for 4, and breathe out for 6. A few minutes of this can take the edge off."
     anxiety:
-      title: Ground yourself
-      text: "Try the 5-4-3-2-1 grounding exercise: name 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste."
+      title: Ground yourself in the room
+      text: "Try a grounding exercise: name 5 things you can see, 4 you can touch, 3 you can hear, 2 you can smell and 1 you can taste."
     sadness:
-      title: Be gentle with yourself
-      text: "Consider reaching out to someone you trust, or taking a short walk. Curated self-care resources are listed below."
+      title: Reach out to someone
+      text: "Send a short message to someone you trust, or step outside for a ten-minute walk. Small comforts count on heavy days."
     anger:
-      title: Take a pause
-      text: "Stepping away for a few minutes, stretching, or writing down what you feel can help you cool down before responding."
+      title: Give it a few minutes
+      text: "Step away before you reply. A brisk walk, or writing down exactly what annoyed you, can help you decide what matters."
     fear:
-      title: You are not alone
-      text: "Naming what worries you and sharing it with someone you trust can make it feel more manageable."
+      title: Make the worry smaller
+      text: "Write down the one thing you are most afraid of, then one small step you can control. Telling someone about it helps too."
     joy:
-      title: Nice to see
-      text: "It sounds like things are going well. Consider noting what contributed to this so you can come back to it later."
+      title: Notice what helped
+      text: "Jot down what made today good, so you can come back to it on harder days."
     surprise:
-      title: Noted
-      text: "Unexpected moments can stir up a lot. Take a moment to notice how you are feeling about it."
+      title: Let it settle
+      text: "Unexpected news can take a while to land. Check in with how you feel about it once it has."
     neutral:
-      title: Thanks for checking in
-      text: "Regular check-ins help you notice changes in how you feel over time."
-  escalation_message: >
-    Over the past {window_days} days, many of your messages have expressed difficult feelings.
-    This tool cannot diagnose anything, but you deserve support. Please consider talking to a
-    qualified mental health professional or someone you trust.
+      title: Keep checking in
+      text: "Short, regular entries make it easier to spot changes over weeks."
+  support_message: >
+    Your entries have shown difficult feelings for several days in a row. This app cannot diagnose
+    anything, but talking to a counsellor, a doctor or someone you trust can really help.
+    You don't have to deal with this alone.
   # VERIFY every number below before shipping or demoing. Numbers change.
   helplines:
-    - { country: IN, name: Tele-MANAS, number: "14416", verified: false }
+    - { country: IN, name: Tele-MANAS, number: "14416 or 1800-891-4416", note: "Free, 24x7, government mental-health line", verified: false }
+    - { country: IN, name: Emergency services, number: "112", note: "If you or someone else is in immediate danger", verified: false }
+    - { country: IN, name: Vandrevala Foundation, number: "+91 9999 666 555", note: "24x7 call or WhatsApp", verified: false }
     # - { country: US, name: 988 Suicide & Crisis Lifeline, number: "988", verified: false }
-  default_country: IN
-  forbidden_phrases:                   # linted by tests/test_recommend.py - wording must stay non-diagnostic
-    - "you have depression"
-    - "you are depressed"
-    - "you have anxiety disorder"
-    - "diagnosis"
-    - "diagnosed"
+  # Phrases that show a message needs the helplines immediately, whatever the model predicts.
+  crisis_phrases:
+    - suicide
+    - suicidal
+    - kill myself
+    - end my life
+    - end it all
+    - want to die
+    - better off dead
+    - self harm
+    - self-harm
+    - hurt myself
+    - cutting myself
+    - hang myself
+    - take my own life
+    - no reason to live
+    - mar jaana
+    - marne ka man
+    - jaan dena
 
 # -----------------------------------------------------------------------------
 # Storage + privacy
 # -----------------------------------------------------------------------------
 database:
   engine: sqlite                       # synopsis lists MongoDB/MySQL/Firebase; SQLite is fine for the prototype
-  path: data/processed/mood_history.db
-  table: predictions
-  # (user_id, timestamp, emotion, confidence, sentiment_score)
-  columns: [user_id, timestamp, emotion, confidence, sentiment_score]
+  path: data/processed/mood_history.db   # schema in src/database.py; raw text is not stored
 
-privacy:
-  consent_required: true               # app must show consent notice before first prediction
-  store_raw_text: false                # default: store only the prediction, never the text
-  anonymize_user_id: true
-  consent_notice: >
-    Your messages are analysed to estimate emotions. By default, the text itself is not stored -
-    only the predicted emotion, a confidence score and a timestamp. You can delete your history at any time.
+# Privacy is enforced in code: src/database.py refuses to store anything without consent and never
+# stores raw text unless store_text=True is passed explicitly (the app never does).
 
 # -----------------------------------------------------------------------------
 # Evaluation
@@ -371,19 +375,19 @@ evaluation:
 # App (Streamlit dashboard; the roadmap notes this is much faster than Flask + JS)
 # -----------------------------------------------------------------------------
 app:
-  framework: streamlit
-  title: "Mood Monitor - Emotional Wellness Support"
-  port: 8501
-  show_disclaimer_banner: true
-  show_confidence: true
   max_input_chars: 1000
 
 # -----------------------------------------------------------------------------
 # Inference
 # -----------------------------------------------------------------------------
 inference:
-  kind: classical
-  path: models/classical/logreg_baseline/pipeline.joblib
+  # Model used by the app and scripts/demo.py.
+  #   goemotions : public RoBERTa fine-tuned on GoEmotions (downloads ~500 MB on first run; never predicts Stress)
+  #   classical  : models/classical/logreg_baseline/pipeline.joblib (our trained baseline, used as the fallback)
+  #   transformer: models/distilbert/final once you fine-tune it (scripts/train_all.py)
+  kind: goemotions
+  path: SamLowe/roberta-base-go_emotions
+  max_len: 128
   device: cpu
   batch_size: 64
 

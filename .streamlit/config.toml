@@ -1,0 +1,20 @@
+# Theme for the Mood Journal dashboard (app/ui.py adds the typefaces and layout on top).
+[theme]
+base = "light"
+primaryColor = "#2D5F73"
+backgroundColor = "#EEF2F1"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#18262B"
+borderColor = "#CBD5D3"
+showWidgetBorder = true
+baseRadius = "8px"
+
+[theme.sidebar]
+backgroundColor = "#E2E9E7"
+secondaryBackgroundColor = "#FFFFFF"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false

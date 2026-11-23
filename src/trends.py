@@ -38,11 +38,6 @@ def negative_scores(probs) -> np.ndarray | float:
     return arr[:, NEG_IDX].sum(axis=1)
 
 
-neg_score = negative_scores
-negative_score = negative_scores
-compute_negative_score = negative_scores
-negative_affect_score = negative_scores
-
 
 def dominant_emotion(probs) -> str:
     """Return dominant emotion name from a dict, list of dicts, array or DataFrame."""
@@ -63,15 +58,12 @@ def dominant_emotion(probs) -> str:
     return LABELS[int(arr.argmax())]
 
 
-get_dominant_emotion = dominant_emotion
-compute_dominant_emotion = dominant_emotion
-
 
 def build_prediction_frame(timestamps, probs, user_id=None, texts=None, true_labels=None) -> pd.DataFrame:
     """One row per message: timestamp, p_<emotion> columns, neg_score, emotion, confidence."""
     probs = np.asarray(probs, dtype=float)
     df = pd.DataFrame(probs, columns=PROB_COLS)
-    df.insert(0, "timestamp", pd.to_datetime(list(timestamps)))
+    df.insert(0, "timestamp", pd.to_datetime(list(timestamps), format="ISO8601"))
     if user_id is not None:
         df.insert(0, "user_id", user_id)
     df["neg_score"] = negative_scores(probs)
@@ -103,10 +95,6 @@ def smooth_scores(series, alpha: float = 0.3) -> pd.Series:
     return series.ewm(alpha=alpha, adjust=False).mean()
 
 
-ema = smooth_scores
-apply_ema = smooth_scores
-exponential_moving_average = smooth_scores
-
 
 def detect_escalation(smoothed: pd.Series, tau: float, k: int, window_days: int | None = None) -> dict:
     """True when the smoothed score exceeds tau for >= k consecutive observed days in the recent window."""
@@ -132,23 +120,40 @@ def current_dominant(df: pd.DataFrame, recent_days: int = 7) -> str:
     return ID2LABEL[int(recent[PROB_COLS].mean().to_numpy().argmax())]
 
 
-def mood_summary(df: pd.DataFrame, cfg: dict | None = None) -> dict:
-    """Everything the dashboard and recommender need, from message-level predictions."""
+def high_runs(daily: pd.DataFrame, tau: float, max_gap_days: int = 3, col: str = "smoothed") -> np.ndarray:
+    """Length of the current run of check-in days with ``col`` > tau, per day.
+
+    Days without entries are skipped, but a gap longer than ``max_gap_days`` between check-ins
+    restarts the count, so two bad weeks a month apart do not join into one run.
+    """
+    runs, run, prev = [], 0, None
+    for ts, v in zip(daily.index, daily[col].to_numpy()):
+        gap = (ts - prev).days if prev is not None else 0
+        prev = ts
+        run = ((run + 1) if gap <= max_gap_days else 1) if v > tau else 0
+        runs.append(run)
+    return np.array(runs, dtype=int)
+
+
+def daily_frame(df: pd.DataFrame, cfg: dict | None = None) -> pd.DataFrame:
+    """Daily aggregate plus the EMA-smoothed score (``smoothed``) and the current high run (``high_run``).
+    Escalation is ``high_run >= trends.k``."""
     cfg = cfg or load_config()
     tc = cfg["trends"]
-    if df.empty:
-        return {"daily": pd.DataFrame(), "weekly": pd.DataFrame(), "monthly": pd.DataFrame(),
-                "smoothed": pd.Series(dtype=float), "escalation": detect_escalation(pd.Series(dtype=float), 1, 1),
-                "latest_dominant": None, "latest_neg_score": None}
     daily = aggregate(df, "daily")
-    smoothed = smooth_scores(daily["neg_score"], tc["alpha"])
-    return {
-        "daily": daily, "weekly": aggregate(df, "weekly"), "monthly": aggregate(df, "monthly"),
-        "smoothed": smoothed,
-        "escalation": detect_escalation(smoothed, tc["tau"], tc["k"], tc.get("window_days")),
-        "latest_dominant": current_dominant(df, tc.get("recent_days", 7)),
-        "latest_neg_score": float(smoothed.iloc[-1]),
-    }
+    daily["smoothed"] = smooth_scores(daily["neg_score"], tc["alpha"])
+    daily["high_run"] = high_runs(daily, tc["tau"], tc.get("max_gap_days", 3))
+    return daily
+
+
+def personal_baseline(df: pd.DataFrame, default_tau: float = 0.55) -> dict:
+    """The user's usual negative-affect level (mean/std over all messages) and a personal alert line.
+    Falls back to population defaults until there are at least two messages."""
+    if len(df) < 2:
+        return {"mean": 0.35, "std": 0.12, "tau_personal": default_tau, "calibrated": False}
+    mean, std = float(df["neg_score"].mean()), float(df["neg_score"].std())
+    return {"mean": mean, "std": std, "tau_personal": float(np.clip(mean + 1.25 * std, 0.40, 0.85)),
+            "calibrated": True}
 
 
 # --------------------------------------------------------------------------- scripted timelines

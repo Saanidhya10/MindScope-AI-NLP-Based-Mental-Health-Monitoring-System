@@ -54,11 +54,39 @@ FALLBACK_STOPWORDS = {
 }
 
 
+# Common Hindi / Hinglish feeling words -> English proxies, so the English-only models still pick them up.
+HINGLISH_MAP = {
+    "udaas": "sad", "udasi": "sadness", "udaasi": "sadness", "dukh": "sadness", "dukhi": "sad",
+    "gham": "grief", "dard": "pain", "rona": "crying", "aansu": "tears", "aansoo": "tears",
+    "akela": "lonely", "akelapan": "loneliness", "tanha": "lonely", "tanhai": "loneliness",
+    "mayus": "hopeless", "mayusi": "hopelessness",
+    "tension": "anxiety stress", "chinta": "anxiety", "fikr": "worry", "fakar": "worry",
+    "pareshaan": "worried distressed", "pareshan": "worried distressed",
+    "pareshaani": "distress", "pareshani": "distress", "ghabrahat": "anxiety panic",
+    "ghabra": "anxious", "dar": "fear", "darr": "fear", "khauf": "fear", "bhay": "fear",
+    "thaka": "exhausted tired", "thakaan": "exhaustion fatigue",
+    "gussa": "anger angry", "krodh": "anger", "naraz": "angry upset",
+    "chid": "irritated", "chirh": "irritated", "nafrat": "hate",
+    "khush": "happy joy", "khushi": "joy happiness", "prasann": "happy",
+    "sukoon": "calm relief", "shanti": "peace", "raahat": "relief", "rahat": "relief",
+    "maza": "fun enjoyment", "anand": "joy delight",
+    "उदास": "sad", "उदासी": "sadness", "दुःख": "sadness", "दुखी": "sad",
+    "चिंता": "anxiety", "परेशान": "worried", "घबराहट": "anxiety panic",
+    "डर": "fear", "गुस्सा": "anger", "क्रोध": "anger", "खुश": "happy",
+    "खुशी": "joy", "सुकून": "calm relief", "अकेला": "lonely", "रोना": "crying",
+}
+
+
+def normalize_hinglish(text: str) -> str:
+    """Replace Hindi/Hinglish feeling words with English proxies (other words are left untouched)."""
+    return " ".join(HINGLISH_MAP.get(w.lower().strip(".,!?:;\"'()[]"), w) for w in text.split())
+
+
 def clean_basic(text: str) -> str:
-    """Shared cleaning: HTML, URLs, handles, placeholders, emoji -> text tokens. Keeps casing."""
+    """Shared cleaning: Hinglish feeling words, HTML, URLs, handles, placeholders, emoji -> text tokens. Keeps casing."""
     if not isinstance(text, str):
         return ""
-    text = html.unescape(text)
+    text = normalize_hinglish(html.unescape(text))
     text = HTML_TAG_RE.sub(" ", text)
     text = URL_RE.sub(" ", text)
     text = GOEMO_TOKEN_RE.sub(" ", text)
@@ -102,16 +130,11 @@ def clean_text(text: str, remove_stopwords: bool = True) -> str:
     return " ".join(toks)
 
 
-preprocess_text = clean_text
-clean = clean_text
-normalize_text = clean_text
-preprocess = clean_text
-
 
 class TextPreprocessor:
     def __init__(self, cfg: dict | None = None, lemmatize: bool | None = None):
         cfg = cfg or load_config()
-        pc = cfg.get("preprocess", {})
+        pc = cfg.get("preprocessing", {})
         self.spacy_model = pc.get("spacy_model", "en_core_web_sm")
         self.lemmatize = pc.get("lemmatize", True) if lemmatize is None else lemmatize
         self._nlp = None

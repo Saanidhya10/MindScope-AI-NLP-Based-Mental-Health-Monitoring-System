@@ -1,214 +1,121 @@
-"""Mood Journal – Streamlit app.   Run from the repo root:  streamlit run app/app.py"""
+"""Mood Journal - Streamlit app.   Run from the repo root:  streamlit run app/app.py"""
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "app"))
 
-import streamlit as st
+import streamlit as st  # noqa: E402
 
-import components as C
-import ui
+import ui  # noqa: E402
+from src import recommend, trends  # noqa: E402
+from src.database import MoodDatabase  # noqa: E402
+from src.inference import EmotionPredictor  # noqa: E402
+from src.sample_journal import sample_entries  # noqa: E402
+from src.utils import load_config  # noqa: E402
 
-st.set_page_config(
-    page_title="Mood Journal",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-
-@st.cache_resource(show_spinner="Loading model…")
-def get_predictor():
-    return C.Predictor()
+st.set_page_config(page_title="Mood Journal", page_icon="📓", layout="wide")
 
 
-def main():
-    ui.render_header()
-    ui.render_disclaimer()
+@st.cache_resource(show_spinner="Loading the emotion model…")
+def get_predictor() -> EmotionPredictor:
+    return EmotionPredictor.from_config(cfg)
 
-    params = C.load_params()
 
-    # ───────────────────────── Sidebar (Comfortably Spaced) ─────────────
-    with st.sidebar:
-        st.markdown(
-            """
-            <div style="display:flex; align-items:center; gap:0.6rem; padding:0.4rem 0 0.8rem;">
-                <span style="font-size:1.6rem; filter:drop-shadow(0 0 10px rgba(166,125,240,0.6));">🧠</span>
-                <div>
-                    <strong style="color:#d4c4ff; font-size:1.05rem; line-height:1.2;">Mood Journal</strong><br>
-                    <span style="font-size:0.75rem; color:#b0a8d0;">Private Wellness Space</span>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+cfg = load_config()
+db = MoodDatabase(cfg=cfg)
+helplines = recommend.get_helplines(cfg)
+ui.inject_css()
 
-        st.markdown('<span style="font-size:0.78rem; font-weight:700; color:#d4c4ff; text-transform:uppercase; letter-spacing:0.05em;">👤 Profile</span>', unsafe_allow_html=True)
-        user_id = (
-            st.text_input(
-                "Profile",
-                value="me",
-                help="Entries are saved per profile on this machine.",
-                placeholder="Enter profile name",
-                label_visibility="collapsed",
-            ).strip() or "me"
-        )
+# ───────────────────────── sidebar: profile, grouping, data controls ─────────────────────────
+with st.sidebar:
+    user_id = st.text_input("Profile name", value="me",
+                            help="Entries are kept separately for each name, on this computer.").strip() or "me"
+    view = st.radio("Group the trend by", ["Day", "Week", "Month"], horizontal=True)
+    hist = db.get_predictions(user_id)
 
-        st.markdown('<span style="font-size:0.78rem; font-weight:700; color:#d4c4ff; text-transform:uppercase; letter-spacing:0.05em;">📊 Timeline View</span>', unsafe_allow_html=True)
-        view = st.radio(
-            "Timeline View",
-            ["Daily", "Weekly", "Monthly"],
-            horizontal=True,
-            label_visibility="collapsed",
-        )
+    st.divider()
+    st.markdown(f"**Your data**  \n{len(hist)} entr{'y' if len(hist) == 1 else 'ies'} saved for *{user_id}*.")
+    st.download_button("Download my scores (CSV)",
+                       hist.drop(columns=["user_id"], errors="ignore").to_csv(index=False).encode(),
+                       file_name=f"{user_id}_mood_scores.csv", mime="text/csv", disabled=hist.empty)
+    with st.expander("Delete all my entries"):
+        sure = st.checkbox("I understand this can't be undone", key=f"del_{user_id}")
+        if st.button("Delete entries", disabled=not sure):
+            n = db.delete_user_data(user_id, keep_user=True)
+            st.toast(f"Deleted {n} entries")
+            st.rerun()
 
-        hist = C.load_history(user_id)
-        st.markdown(
-            f'<div class="vi-profile-badge">'
-            f'📝 <strong>{len(hist)}</strong> entries recorded for <em>{user_id}</em></div>',
-            unsafe_allow_html=True,
-        )
+# ───────────────────────── header ─────────────────────────
+ui.header(helplines)
 
-        st.download_button(
-            "⬇️ Export Data (CSV)",
-            C.export_history_csv(user_id),
-            file_name=f"{user_id}_mood_scores.csv",
-            mime="text/csv",
-        )
-
-        st.markdown("<div style='height:0.2rem;'></div>", unsafe_allow_html=True)
-
-        with st.expander("🗑️ Clear My History"):
-            sure = st.checkbox("Confirm permanent deletion", key="confirm_del")
-            if st.button("Delete My Entries", disabled=not sure):
-                deleted_count = C.delete_history(user_id)
-                st.toast(f"Deleted {deleted_count} records")
+# ───────────────────────── today's entry + result ─────────────────────────
+left, right = st.columns([1.1, 1], gap="large")
+with left:
+    ui.section("Today's entry")
+    with st.container(key="mj-entry"):
+        consent = st.checkbox("Analyse my entries and keep the scores on this computer. The text itself is never saved.",
+                              value=db.has_consent(user_id), key=f"consent_{user_id}")
+        if consent != db.has_consent(user_id):
+            db.set_consent(user_id, consent)
+        with st.form("entry", clear_on_submit=True, border=False):
+            text = st.text_area("What happened today, and how did it feel?", height=170,
+                                max_chars=cfg["app"]["max_input_chars"],
+                                placeholder="Work felt overwhelming and I'm nervous about tomorrow's presentation, "
+                                            "but finishing the slides was a relief.")
+            submitted = st.form_submit_button("Analyse entry", type="primary", disabled=not consent)
+        if not consent:
+            st.caption("Tick the box above to start. You can untick it any time to pause.")
+        if hist.empty and consent:
+            if st.button("Add sample entries",
+                         help="Runs an invented three-week journal through the model so you can see how trends look."):
+                entries = sample_entries()
+                for (ts, _), p in zip(entries, get_predictor().predict_proba([t for _, t in entries])):
+                    db.add_prediction(user_id, p, ts)
+                st.toast(f"Added {len(entries)} sample entries")
                 st.rerun()
 
-        st.markdown(
-            """
-            <div style="font-size:0.72rem; color:#6a6090; text-align:center; margin-top:0.6rem;">
-                Mood Journal · Wellness Support · Not Medical
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    # ───────────────────────── Consent ─────────────────────────────────────
-    consent = ui.render_consent()
-
-    # ───────────────────────── Main Two-Column Layout ──────────────────────
-    left, right = st.columns([1, 1], gap="large")
-
-    # ── Left Column: Journal Entry ──────────────────────────────────────────
-    with left:
-        ui.render_section_title("✍️", "How are you feeling?", "Daily Emotional Check-in")
-        st.markdown('<div class="vi-card">', unsafe_allow_html=True)
-        st.caption("Write a few honest sentences. The model identifies fine-grained emotions in real time.")
-
-        with st.form("entry", clear_on_submit=True):
-            text = st.text_area(
-                "Your entry",
-                height=140,
-                placeholder="e.g. Work felt overwhelming today and I'm anxious about the presentation tomorrow, but relieved to finish the slides…",
-                label_visibility="collapsed",
-            )
-            submitted = st.form_submit_button(
-                "✨ Analyse my mood",
-                disabled=not consent,
-            )
-
-        if not consent:
-            st.caption("☝️ Tick the consent box above to enable analysis.")
-
-        if submitted:
-            if len(text.split()) < 3:
-                st.warning("Please write at least a few words — very short text is hard to classify reliably.")
-            else:
-                try:
-                    pred = get_predictor()
-                except FileNotFoundError as e:
-                    st.error(str(e))
-                else:
-                    probs = pred.predict_proba(text)
-                    C.add_prediction(user_id, probs)
-                    st.session_state["last"] = (probs, pred.label, text)
-                    # Refresh to ensure right column and trend graphs update immediately
-                    st.rerun()
-
-        if "last" in st.session_state:
-            st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
-            ui.render_entry_result(*st.session_state["last"])
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── Right Column: Suggestions & Real-Time Insights ──────────────────────
-    hist = C.load_history(user_id)
-    daily = C.daily_summary(hist, params["alpha"]) if len(hist) else None
-    baseline = C.compute_personalized_baseline(hist, params["tau"])
-    anomaly = (
-        C.detect_anomalies_and_trend(hist, daily, baseline, baseline["tau_personal"])
-        if daily is not None and not daily.empty
-        else {"status": "Awaiting", "badge": "🟢 Stable", "color": "#7c5cbf", "desc": "Record entries to begin personalized trend detection."}
-    )
-
-    with right:
-        ui.render_section_title("💡", "Suggestions & Real-Time Insights", "Personalized Support & Patterns")
-        st.markdown('<div class="vi-card">', unsafe_allow_html=True)
-
-        if daily is None or daily.empty:
-            st.info(
-                "Add your first journal entry on the left to see instant emotional insights, suggestions, "
-                "and personalized baseline patterns here.",
-                icon="🌱",
-            )
+    if submitted:
+        if len(text.split()) < 3:
+            st.warning("Write at least a few words. Very short entries are hard to read reliably.")
         else:
-            flags = C.escalation_flags(daily, params["tau"], params["k"], params["max_gap_days"])
-            ui.render_summary_metrics(daily, len(hist))
-            st.markdown("<div style='height:0.4rem;'></div>", unsafe_allow_html=True)
-            ui.render_recommendation(C.recommend(daily, flags, params["tau"], anomaly))
+            probs = get_predictor().predict_proba(text)[0]
+            db.add_prediction(user_id, probs)
+            st.session_state["last"] = (probs, recommend.check_crisis(text, cfg))
+            st.toast("Entry analysed and saved")
+            st.rerun()
 
-            # Narrative explanation & personalized baseline monitoring (Zero graphs)
-            ui.render_recent_mood_analysis(hist, daily, baseline, anomaly)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # ───────────────────────── Bottom Section: Long-Term Trends ────────────
-    ui.render_section_title("📈", f"Mood Stability & Trajectory ({view} View)", "Unified Longitudinal History")
-    st.markdown('<div class="vi-card">', unsafe_allow_html=True)
-
-    if daily is None or daily.empty:
-        st.info(
-            "No historical mood entries recorded yet for this profile. Submit a check-in above to track your stability trajectory.",
-            icon="📊",
-        )
+with right:
+    ui.section("What came through")
+    if "last" in st.session_state:
+        probs, crisis = st.session_state["last"]
+        ui.entry_result(probs, crisis, helplines, get_predictor().label)
     else:
-        flags = C.escalation_flags(daily, params["tau"], params["k"], params["max_gap_days"])
-        ui.render_trends(
-            daily,
-            C.window_summary(hist, "7D"),
-            C.window_summary(hist, "MS"),
-            params["tau"],
-            flags,
-            view,
-            baseline,
-        )
+        ui.entry_placeholder()
 
-    st.markdown("</div>", unsafe_allow_html=True)
+# ───────────────────────── history ─────────────────────────
+ui.section("The last four weeks", "Each block is one day, coloured by the feeling that came through most.")
+ui.mood_ribbon(hist)
 
-    # ───────────────────────── Footer ──────────────────────────────────────
-    st.markdown(
-        """
-        <div style="text-align:center; padding:1.2rem 0 0.5rem;
-                    color:#6a6090; font-size:0.8rem; opacity:0.85;">
-            🧠 Mood Journal &nbsp;·&nbsp; A wellness-support tool, not a medical device &nbsp;·&nbsp;
-            Trends reflect self-reported words, not your clinical diagnosis.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+if not hist.empty:
+    daily = trends.daily_frame(hist, cfg)
+    baseline = trends.personal_baseline(hist, cfg["trends"]["tau"])
+    status = recommend.assess(daily, baseline, cfg)
 
+    ui.section("How you've been")
+    ui.status_card(status)
 
-main()
+    mix, trend = st.columns([1, 1.6], gap="large")
+    with mix:
+        ui.section("Emotion mix", "Main feeling of each entry in the last 30 days.")
+        ui.emotion_mix(hist)
+    with trend:
+        ui.section("Difficult feelings over time",
+                   f"Share of sadness, anger, fear, anxiety and stress in your entries, by {view.lower()}. "
+                   f"Support is suggested after {cfg['trends']['k']} days above the support line.")
+        ui.trend_chart(hist, daily, view, baseline, cfg["trends"]["tau"])
+
+ui.footer(get_predictor().label)
