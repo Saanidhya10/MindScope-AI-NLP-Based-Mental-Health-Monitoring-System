@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 preprocess = pytest.importorskip("src.preprocess", reason="src/preprocess.py not importable")
 
-CANDIDATES = ["clean_text", "preprocess_text", "preprocess", "normalize_text", "clean"]
+CANDIDATES = ["clean_text"]
 
 
 def _find(module, names):

@@ -1,5 +1,10 @@
 """Unified inference wrapper: load any trained model and get an 8-class probability distribution.
 
+Kinds: ``classical`` (TF-IDF pipeline), ``bilstm``, ``transformer`` (our fine-tuned DistilBERT/RoBERTa) and
+``goemotions`` - a public model fine-tuned on GoEmotions' 28 labels (e.g. SamLowe/roberta-base-go_emotions),
+collapsed to our 8 classes with config.yaml -> label_mapping.goemotions. GoEmotions has no Stress label, so
+that model never predicts Stress; stressful text lands on Anxiety/Sadness/Fear instead.
+
     predictor = EmotionPredictor.from_config(cfg)          # reads cfg['inference']
     predictor.predict("I can't stop worrying about tomorrow")
     predictor.predict_proba(["text 1", "text 2"])          # (n, 8) array, columns ordered as utils.LABELS
@@ -22,7 +27,8 @@ class EmotionPredictor:
                  batch_size: int = 64):
         self.cfg = cfg or load_config()
         self.kind = kind
-        self.path = resolve_path(path)
+        # a Hugging Face Hub id ("org/name") is kept as-is; everything else is a path in the repo
+        self.path = path if kind == "goemotions" and not resolve_path(path).exists() else resolve_path(path)
         self.batch_size = batch_size
         self.pre = TextPreprocessor(self.cfg)
         self._device = device
@@ -31,8 +37,12 @@ class EmotionPredictor:
     @classmethod
     def from_config(cls, cfg: dict | None = None, **kw) -> "EmotionPredictor":
         cfg = cfg or load_config()
-        if "inference" in cfg and "kind" in cfg["inference"] and "path" in cfg["inference"]:
-            return cls(cfg["inference"]["kind"], cfg["inference"]["path"], cfg, **kw)
+        ic = cfg.get("inference", {})
+        if "kind" in ic and "path" in ic:
+            try:
+                return cls(ic["kind"], ic["path"], cfg, **kw)
+            except (ImportError, OSError) as e:  # torch/transformers missing, or the model can't be downloaded
+                log.warning("Could not load %s model '%s' (%s); falling back to a local model.", ic["kind"], ic["path"], e)
 
         for kind in ["distilbert", "roberta"]:
             p = resolve_path(f"models/{kind}/final")
@@ -72,6 +82,18 @@ class EmotionPredictor:
                                           pad_idx=self.vocab.pad_idx)
             self.model.load_state_dict(torch.load(self.path / "model.pt", map_location=self.device))
             self.model.to(self.device).eval()
+        elif self.kind == "goemotions":
+            import torch
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+            self.device = torch.device(self._device or "cpu")
+            self.tokenizer = AutoTokenizer.from_pretrained(str(self.path))
+            self.model = AutoModelForSequenceClassification.from_pretrained(str(self.path)).to(self.device).eval()
+            self.max_len = self.cfg.get("inference", {}).get("max_len", 128)
+            group = {name: cls for cls, names in self.cfg["label_mapping"]["goemotions"].items() for name in names}
+            id2label = self.model.config.id2label
+            # column j of the 28-label output -> index of our class
+            self._group_idx = np.array([LABELS.index(group[id2label[j]]) for j in range(len(id2label))])
         elif self.kind in ("distilbert", "roberta", "transformer"):
             import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -79,7 +101,7 @@ class EmotionPredictor:
             self.device = torch.device(self._device or ("cuda" if torch.cuda.is_available() else "cpu"))
             self.tokenizer = AutoTokenizer.from_pretrained(str(self.path))
             self.model = AutoModelForSequenceClassification.from_pretrained(str(self.path)).to(self.device).eval()
-            self.max_len = self.cfg["transformer"]["max_len"]
+            self.max_len = self.cfg.get("transformer", {}).get("max_len", 64)
         else:
             raise ValueError(f"Unknown model kind '{self.kind}'")
         log.info("Loaded %s model from %s", self.kind, self.path)
@@ -91,6 +113,8 @@ class EmotionPredictor:
             return self._proba_classical(texts)
         if self.kind == "bilstm":
             return self._proba_bilstm(texts)
+        if self.kind == "goemotions":
+            return self._proba_goemotions(texts)
         return self._proba_transformer(texts)
 
     def _proba_classical(self, texts) -> np.ndarray:
@@ -120,6 +144,31 @@ class EmotionPredictor:
                                      padding=True, return_tensors="pt").to(self.device)
                 out.append(torch.softmax(self.model(**enc).logits, dim=-1).cpu().numpy())
         return np.concatenate(out)
+
+    @property
+    def label(self) -> str:
+        """Short human-readable model name, e.g. 'logreg_baseline (classical)'."""
+        if self.kind == "goemotions":
+            return f"{str(self.path).split('/')[-1]} (pretrained)"
+        name = self.path.parent.name if self.path.name == "pipeline.joblib" else self.path.name
+        return f"{name} ({self.kind})"
+
+    def _proba_goemotions(self, texts) -> np.ndarray:
+        """Sigmoid per GoEmotions label, then each of our classes takes its strongest sub-label (max, not sum,
+        so Joy's 11 sub-labels don't outweigh single-label classes like Anxiety), renormalised to sum to 1."""
+        import torch
+
+        clean = [self.pre.transformer(t) or "." for t in texts]
+        out = np.zeros((len(clean), NUM_CLASSES))
+        with torch.no_grad():
+            for i in range(0, len(clean), self.batch_size):
+                enc = self.tokenizer(clean[i:i + self.batch_size], truncation=True, max_length=self.max_len,
+                                     padding=True, return_tensors="pt").to(self.device)
+                sig = torch.sigmoid(self.model(**enc).logits).cpu().numpy()
+                for j, c in enumerate(self._group_idx):
+                    out[i:i + len(sig), c] = np.maximum(out[i:i + len(sig), c], sig[:, j])
+        out = out + 1e-9
+        return out / out.sum(axis=1, keepdims=True)
 
     def predict(self, text: str) -> dict:
         p = self.predict_proba([text])[0]
@@ -152,7 +201,3 @@ def predict(text: str) -> dict:
 def predict_proba(texts) -> np.ndarray:
     return get_default_predictor().predict_proba(texts)
 
-
-predict_emotion = predict
-classify = predict
-predict_text = predict

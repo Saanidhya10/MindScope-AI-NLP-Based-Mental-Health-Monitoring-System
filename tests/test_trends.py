@@ -77,9 +77,9 @@ def _find(names):
     return None
 
 
-NEG_CANDIDATES = ["negative_affect_score", "compute_negative_score", "negative_score", "neg_score"]
-DOM_CANDIDATES = ["dominant_emotion", "get_dominant_emotion", "compute_dominant_emotion"]
-EMA_CANDIDATES = ["ema", "exponential_moving_average", "smooth_scores", "smooth", "apply_ema"]
+NEG_CANDIDATES = ["negative_scores"]
+DOM_CANDIDATES = ["dominant_emotion"]
+EMA_CANDIDATES = ["smooth_scores"]
 
 neg_fn = _find(NEG_CANDIDATES)
 dom_fn = _find(DOM_CANDIDATES)

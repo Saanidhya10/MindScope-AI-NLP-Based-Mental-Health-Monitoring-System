@@ -100,8 +100,7 @@ mental-health-nlp/
 │   └── database.py          # SQLite mood-history storage
 ├── app/
 │   ├── app.py               # Streamlit entry point
-│   ├── ui.py                # page layout
-│   └── components.py        # charts, recommendation card, disclaimer/consent
+│   └── ui.py                # styles, mood ribbon, status card, charts (theme: .streamlit/config.toml)
 ├── scripts/
 │   ├── setup_data.py        # download + map + split
 │   ├── train_all.py
@@ -223,14 +222,25 @@ The complete **Minor Project Report (66 pages)** is maintained in the [`report/`
 
 ## Dashboard
 
-Built with **Streamlit** (`streamlit run app/app.py`). The dashboard features a clean, responsive, distraction-free interface:
+Built with **Streamlit** (`streamlit run app/app.py` from the repo root). The app is a thin layer over `src/`
+(inference, database, trends, recommend); `app/ui.py` only draws.
 
-- **Streamlined 2-Graph Layout**:
-  1. **Emotion Distribution (Donut Chart)**: Visualizes the proportion of recent affective states.
-  2. **Mood Stability Trajectory (0–100%)**: Tracks smoothed stability against the user's personal baseline with a stable, fixed y-axis.
-- **Clean Card Hierarchy**: Category headers positioned cleanly above separator cards and tabs.
-- **Evidence-Based Suggestions**: Gentle coping exercises (breathing techniques, mindfulness prompts) tailored to detected affect.
-- **Privacy & Safety First**: Explicit consent toggle, zero raw-text disk persistence, and automatic escalation to India's **Tele-MANAS (14416)** helpline during persistent negative affect.
+- **Today's entry**: write a few lines; the model shows the feelings it found, strongest first, with a plain-language
+  note on how sure it is. Messages that mention self-harm show helplines immediately, whatever the model predicts.
+- **The last four weeks**: one block per day, coloured by the main feeling.
+- **How you've been**: a single status (steady / watch / support) from the smoothed negative-affect trend and the
+  user's personal baseline, with one suggestion. Sustained distress adds the helplines from `config.yaml`.
+- **Emotion mix** (donut, last 30 days) and **difficult feelings over time** (by day, week or month).
+- **Privacy**: opt-in consent saved per profile, raw text never stored, CSV export and delete in the sidebar.
+- **Sample entries**: an empty profile can load the invented journal in `src/sample_journal.py`, run through the real model.
+
+**Model**: by default the app uses the public `SamLowe/roberta-base-go_emotions` model (downloaded on first run,
+~500 MB), collapsed from GoEmotions' 28 labels to our classes (`config.yaml -> inference`). On the GoEmotions test
+split (single-class rows, 7 classes) it scores macro-F1 0.65 vs 0.50 for our TF-IDF + LR baseline, and Anxiety F1
+0.54 vs 0.00. It never predicts Stress, because GoEmotions has no stress label. If it can't be loaded, the app falls
+back to the local baseline. Set `inference.kind` to `transformer` once you fine-tune DistilBERT.
+
+Theme: `.streamlit/config.toml`. Type: Literata (journal voice) and Lexend (interface).
 
 ---
 

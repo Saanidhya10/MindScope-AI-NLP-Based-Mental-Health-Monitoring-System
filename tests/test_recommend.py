@@ -25,8 +25,8 @@ def _find(names):
     return None
 
 
-SUGGEST_CANDIDATES = ["get_suggestion", "recommend", "get_recommendation", "suggest", "recommend_for_emotion"]
-ESCALATE_CANDIDATES = ["should_escalate", "check_escalation", "needs_escalation", "escalate", "evaluate_escalation"]
+SUGGEST_CANDIDATES = ["get_suggestion"]
+ESCALATE_CANDIDATES = ["should_escalate"]
 
 suggest_fn = _find(SUGGEST_CANDIDATES)
 escalate_fn = _find(ESCALATE_CANDIDATES)
