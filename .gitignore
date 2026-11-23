@@ -110,3 +110,6 @@ NLP_Mental_Health_Monitoring_Project.zip
 /Humanized_Minor_Project_Report.md
 /humanize_in_place.py
 /report_generator/
+*.docx.bak
+test_tab.docx
+app_screenshot.png
