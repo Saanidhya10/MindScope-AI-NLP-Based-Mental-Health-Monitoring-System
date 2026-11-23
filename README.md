@@ -231,6 +231,11 @@ Built with **Streamlit** (`streamlit run app/app.py` from the repo root). The ap
 - **How you've been**: a single status (steady / watch / support) from the smoothed negative-affect trend and the
   user's personal baseline, with one suggestion. Sustained distress adds the helplines from `config.yaml`.
 - **Emotion mix** (donut, last 30 days) and **difficult feelings over time** (by day, week or month).
+- **Voice entries** (English only): choose *Record* instead of *Write*. Whisper (`small.en`, local) transcribes the
+  recording and the transcript goes through the same emotion model and crisis check. With the tone option on, a
+  speech-emotion model (`superb/wav2vec2-base-superb-er`, 4 classes) scores the tone of voice and is blended in at
+  weight 0.25, one-directionally: tone can add evidence of difficult feelings but never lowers what the words say.
+  Recordings are processed in memory and never saved. Settings: `config.yaml -> voice`.
 - **Privacy**: opt-in consent saved per profile, raw text never stored, CSV export and delete in the sidebar.
 - **Sample entries**: an empty profile can load the invented journal in `src/sample_journal.py`, run through the real model.
 

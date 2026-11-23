@@ -85,6 +85,21 @@ trained model; the report still needs the fine-tuned DistilBERT (see "Next steps
   `assess()` levels, crisis phrases, non-diagnostic wording of every configured suggestion.
 - Existing tests point at canonical function names. 58 passing.
 
+## 7. Voice entries (English only)
+
+- New `src/voice.py`: `load_audio()` (any WAV sample rate -> mono 16 kHz), `VoiceAnalyzer.transcribe()`
+  (faster-whisper `small.en`, local, language fixed to English), `VoiceAnalyzer.tone_proba()` (speech-emotion model
+  `superb/wav2vec2-base-superb-er`: neutral/happy/angry/sad mapped to Neutral/Joy/Anger/Sadness) and `fuse()`.
+- **Fusion is one-directional**: tone is blended in at `voice.tone_weight` (0.25) only when it points to more
+  difficult feelings than the words. A cheerful-sounding voice never cancels distress in what was said, because
+  speech-emotion models trained on acted speech are unreliable on everyday voices.
+- App: *Write* / *Record* choice in the entry box (`st.audio_input`), a separate opt-in for tone, and a result panel
+  that shows what was heard, how the voice sounded and whether tone changed the reading. Recordings are held in
+  memory only; as with text, only the scores are stored. Models load on first use (about 1 GB, cached).
+- New `tests/test_voice.py` (5 tests): resampling, tone mapping, fusion never lowering distress.
+- Not yet verified end to end with a real microphone in the browser; the model calls were smoke-tested on
+  synthetic speech (transcription exact; the tone model rated the synthetic voice "happy", as expected for TTS).
+
 ## How to run
 
 ```bash
