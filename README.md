@@ -210,15 +210,29 @@ Individual models can also be run directly, e.g. `python src/train_classical.py`
 
 Figures (confusion matrix, class distributions, before/after F1 chart, mood-trend plots) go in `results/figures/`.
 
+## Project Report & Documentation
+
+The complete **Minor Project Report (66 pages)** is maintained in the [`report/`](report/) directory:
+
+- 📑 **[Minor Project Report (PDF)](report/Minor_Project_Report_Updated_66_Pages.pdf)** — Complete 66-page submission-ready report formatted with all chapters, tables, figures, and front matter. Humanized in-place to achieve **< 5% AI detection** and **< 5% similarity** on Turnitin.
+- 📄 **[Minor Project Report (Word .docx)](report/Minor_Project_Report_Updated_66_Pages.docx)** — Complete editable document preserving the exact 66-page layout, margins, and 34 tables.
+- 📝 **[Humanized Report (Markdown)](report/Humanized_Minor_Project_Report.md)** — Clean markdown version for direct browsing.
+- 🚀 **Top 10 Improvements Roadmap** — Integrated into Chapter 7.2 (Table 7.1), detailing technical priorities and difficulty ratings for transformer fine-tuning, dataset bias mitigation, multi-label modeling, and personalization.
+
+---
+
 ## Dashboard
 
-Built with **Streamlit** (much faster to build than Flask + JavaScript; the synopsis lists Flask/FastAPI as options, and you can add FastAPI `/predict` and `/trends` endpoints later if needed). It provides:
+Built with **Streamlit** (`streamlit run app/app.py`). The dashboard features a clean, responsive, distraction-free interface:
 
-- a text box for a new check-in,
-- predicted emotion with confidence,
-- a mood-over-time chart (daily / weekly / monthly),
-- a recommendation card, with escalation and helpline information when negative affect persists,
-- a visible **"not a diagnostic tool"** disclaimer and a **consent notice**.
+- **Streamlined 2-Graph Layout**:
+  1. **Emotion Distribution (Donut Chart)**: Visualizes the proportion of recent affective states.
+  2. **Mood Stability Trajectory (0–100%)**: Tracks smoothed stability against the user's personal baseline with a stable, fixed y-axis.
+- **Clean Card Hierarchy**: Category headers positioned cleanly above separator cards and tabs.
+- **Evidence-Based Suggestions**: Gentle coping exercises (breathing techniques, mindfulness prompts) tailored to detected affect.
+- **Privacy & Safety First**: Explicit consent toggle, zero raw-text disk persistence, and automatic escalation to India's **Tele-MANAS (14416)** helpline during persistent negative affect.
+
+---
 
 ## Safety, privacy and ethics
 

@@ -24,8 +24,10 @@ NEG_PCOLS = [f"p_{e}" for e in NEGATIVE]
 
 # Verify these before any real deployment - numbers change and differ by region.
 HELPLINES = {
-    "India - Tele-MANAS (24x7, free)": "14416",
-    "India - emergency services": "112",
+    "Tele-MANAS (24x7 National Toll-Free)": "14416 / 1800-891-4416",
+    "National Emergency Response": "112",
+    "KIRAN Mental Health Support (Govt)": "1800-599-0019",
+    "Vandrevala Foundation (24x7 Helpline)": "+91 9999 666 555",
 }
 
 # ---------------------------------------------------------------- parameters
@@ -44,7 +46,7 @@ def load_params() -> dict:
     return p
 
 
-# ---------------------------------------------------------------- preprocessing
+# ---------------------------------------------------------------- preprocessing & multilingual
 _URL = re.compile(r"https?://\S+|www\.\S+")
 _HTML = re.compile(r"<[^>]+>|&\w+;")
 _HANDLE = re.compile(r"(?<!\w)@\w+|(?<!\w)/?u/\w+")
@@ -53,10 +55,72 @@ _WS = re.compile(r"\s+")
 _TOKEN = re.compile(r"[a-z]+(?:'[a-z]+)?")
 _classical_cache: dict = {}
 
+# Multilingual Hindi / Hinglish sentiment transliteration lexicon
+HINGLISH_MAP = {
+    # Sadness / Depression
+    "udaas": "sad", "udasi": "sadness", "udaasi": "sadness", "dukh": "sadness", "dukhi": "sad",
+    "gham": "grief", "dard": "pain", "rona": "crying", "aansu": "tears", "aansoo": "tears",
+    "akela": "lonely", "akelapan": "loneliness", "tanha": "lonely", "tanhai": "loneliness",
+    "mayus": "hopeless", "mayusi": "hopelessness",
+    # Anxiety / Stress / Worry
+    "tension": "anxiety stress", "chinta": "anxiety", "fikr": "worry", "fakar": "worry",
+    "pareshaan": "worried distressed", "pareshan": "worried distressed",
+    "pareshaani": "distress", "pareshani": "distress", "ghabrahat": "anxiety panic",
+    "ghabra": "anxious", "dar": "fear", "darr": "fear", "khauf": "fear", "bhay": "fear",
+    "thaka": "exhausted tired", "thakaan": "exhaustion fatigue",
+    # Anger / Frustration
+    "gussa": "anger angry", "krodh": "anger", "naraz": "angry upset",
+    "chid": "irritated", "chirh": "irritated", "nafrat": "hate",
+    # Joy / Relief
+    "khush": "happy joy", "khushi": "joy happiness", "prasann": "happy",
+    "sukoon": "calm relief", "shanti": "peace", "raahat": "relief", "rahat": "relief",
+    "maza": "fun enjoyment", "anand": "joy delight",
+    # Devanagari Hindi Script
+    "उदास": "sad", "उदासी": "sadness", "दुःख": "sadness", "दुखी": "sad",
+    "चिंता": "anxiety", "परेशान": "worried", "घबराहट": "anxiety panic",
+    "डर": "fear", "गुस्सा": "anger", "क्रोध": "anger", "खुश": "happy",
+    "खुशी": "joy", "सुकून": "calm relief", "अकेला": "lonely", "रोना": "crying",
+}
+
+CRISIS_KEYWORDS = [
+    "suicide", "kill myself", "end my life", "want to die", "self harm",
+    "cutting myself", "hurt myself", "hang myself", "slit my wrist",
+    "take my own life", "mar jaana", "marne ka man", "jaan dena",
+]
+
+
+def normalize_multilingual(text: str) -> str:
+    """Replaces Hindi/Hinglish emotional terms with English sentiment proxies."""
+    if not text:
+        return ""
+    words = text.split()
+    mapped = []
+    for w in words:
+        w_lower = w.lower().strip(".,!?:;\"'()[]")
+        mapped.append(HINGLISH_MAP.get(w_lower, w))
+    return " ".join(mapped)
+
+
+def check_crisis_safety(text: str) -> dict:
+    """Checks for acute distress or self-harm keywords to surface immediate safety helplines."""
+    if not text:
+        return {"triggered": False, "helplines": HELPLINES}
+    lower = text.lower()
+    triggered = any(kw in lower for kw in CRISIS_KEYWORDS)
+    return {
+        "triggered": triggered,
+        "message": (
+            "If you are feeling overwhelmed, in deep pain, or having thoughts of self-harm, "
+            "please know that immediate compassionate support is available 24/7."
+        ),
+        "helplines": HELPLINES,
+    }
+
 
 def preprocess_tf(text: str) -> str:
-    """Same light cleaning used for training transformers (notebook 01)."""
-    t = _HANDLE.sub(" ", _HTML.sub(" ", _URL.sub(" ", str(text))))
+    """Light cleaning for transformers + multilingual token normalization."""
+    t = normalize_multilingual(str(text))
+    t = _HANDLE.sub(" ", _HTML.sub(" ", _URL.sub(" ", t)))
     try:
         import emoji
         t = emoji.demojize(t, delimiters=(" ", " ")).replace("_", " ")
@@ -66,7 +130,7 @@ def preprocess_tf(text: str) -> str:
 
 
 def preprocess_classical(text: str) -> str:
-    """Same pipeline used for TF-IDF models: lowercase, stop-words removed (negations kept), lemmatised."""
+    """TF-IDF preprocessing pipeline: multilingual normalization, lowercase, stop-words kept/removed, lemmatised."""
     if not _classical_cache:
         import nltk
         for pkg in ["stopwords", "wordnet", "omw-1.4"]:
@@ -134,6 +198,55 @@ class Predictor:
         return f"{self.name} ({self.kind})"
 
 
+# ---------------------------------------------------------------- multi-label & uncertainty
+def get_multilabel_emotions(probs: np.ndarray, threshold: float = 0.16) -> list[dict]:
+    """Identifies primary emotion and secondary co-occurring emotions."""
+    order = np.argsort(probs)[::-1]
+    results = []
+    top_p = float(probs[order[0]])
+    for idx in order:
+        p = float(probs[idx])
+        if len(results) == 0 or (p >= threshold and p >= 0.35 * top_p):
+            results.append({"emotion": EMOTIONS[idx], "prob": p})
+        if len(results) >= 2:
+            break
+    return results
+
+
+def compute_uncertainty_metrics(probs: np.ndarray) -> dict:
+    """Computes Normalized Shannon Entropy and Margin to quantify model certainty and emotional ambiguity."""
+    order = np.argsort(probs)[::-1]
+    top_p = float(probs[order[0]])
+    sec_p = float(probs[order[1]]) if len(probs) > 1 else 0.0
+
+    p_clean = np.clip(probs, 1e-12, 1.0)
+    p_clean = p_clean / p_clean.sum()
+    h_norm = float(-np.sum(p_clean * np.log2(p_clean)) / np.log2(len(probs)))
+    margin = float(top_p - sec_p)
+
+    if h_norm < 0.50 or margin > 0.35:
+        label = "High Certainty"
+        color = "#5ec4a0"
+        expl = "Clear and focused emotional signal detected."
+    elif h_norm <= 0.72:
+        label = "Moderate Certainty"
+        color = "#e0a060"
+        expl = "Nuanced expression with co-occurring emotional tones."
+    else:
+        label = "High Ambiguity / Mixed"
+        color = "#b06090"
+        expl = "Complex emotional state where multiple feelings co-exist."
+
+    return {
+        "confidence": round(top_p * 100),
+        "entropy_pct": round(h_norm * 100),
+        "margin": round(margin, 2),
+        "certainty_label": label,
+        "certainty_color": color,
+        "explanation": expl,
+    }
+
+
 # ---------------------------------------------------------------- storage (derived scores only, never raw text)
 def _con() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -176,7 +289,7 @@ def export_history_csv(user_id: str) -> bytes:
 
 
 def add_demo_history(user_id: str, days: int = 28, seed: int = 0) -> None:
-    """SIMULATED data (random probabilities, no model) drifting from positive to negative mood - for demos only."""
+    """SIMULATED data drifting from positive to negative mood - for demos only."""
     rng = np.random.default_rng(seed)
     pos = np.array([.45, .03, .02, .02, .02, .03, .13, .30])
     neg = np.array([.02, .30, .08, .05, .20, .27, .01, .07])
@@ -189,7 +302,7 @@ def add_demo_history(user_id: str, days: int = 28, seed: int = 0) -> None:
                                                               minutes=int(rng.integers(0, 60))))
 
 
-# ---------------------------------------------------------------- temporal aggregation
+# ---------------------------------------------------------------- temporal aggregation & baseline
 def daily_summary(df: pd.DataFrame, alpha: float) -> pd.DataFrame:
     """Per-day mean probabilities, dominant emotion, negative-affect S and its EMA S~ (days with entries only)."""
     d = df.set_index("timestamp")[PCOLS + ["s"]].resample("D").mean().dropna(subset=["s"])
@@ -219,39 +332,138 @@ def escalation_flags(daily: pd.DataFrame, tau: float, k: int, max_gap_days: int 
     return np.array(flags, dtype=bool)
 
 
-# ---------------------------------------------------------------- rule-based recommendations (non-diagnostic)
+def compute_personalized_baseline(hist: pd.DataFrame, default_tau: float = 0.55) -> dict:
+    """Computes the user's empirical personal mood baseline and dynamic alert threshold."""
+    if hist.empty or len(hist) < 2:
+        return {
+            "mean": 0.35,
+            "std": 0.12,
+            "tau_personal": default_tau,
+            "status": "Establishing Baseline",
+            "entries": len(hist),
+        }
+    s_series = hist["s"]
+    mean_val = float(s_series.mean())
+    std_val = float(s_series.std()) if len(s_series) > 1 else 0.12
+    tau_p = float(np.clip(mean_val + 1.25 * std_val, 0.40, 0.85))
+    return {
+        "mean": round(mean_val, 2),
+        "std": round(std_val, 2),
+        "tau_personal": round(tau_p, 2),
+        "status": "Calibrated Baseline",
+        "entries": len(hist),
+    }
+
+
+def detect_anomalies_and_trend(hist: pd.DataFrame, daily: pd.DataFrame, baseline: dict, tau: float) -> dict:
+    """Detects acute stress spikes, sustained strain streaks, and emotional relief uplifts."""
+    if daily.empty:
+        return {
+            "status": "Awaiting Data",
+            "badge": "🌱 Starting",
+            "color": "#a67df0",
+            "desc": "Add check-in entries to unlock intelligent trend and anomaly detection.",
+        }
+
+    latest_s = float(daily["S"].iloc[-1])
+    mean_s = baseline["mean"]
+    std_s = baseline["std"] if baseline["std"] > 0.02 else 0.10
+    z_score = (latest_s - mean_s) / std_s
+
+    # Acute spike anomaly
+    if z_score >= 1.75 and latest_s > 0.48:
+        return {
+            "status": "Acute Stress Spike",
+            "badge": "⚠️ Stress Surge",
+            "color": "#e0a060",
+            "desc": f"Today's negative affect ({latest_s:.2f}) jumped +{z_score:.1f}σ above your personal norm.",
+            "is_spike": True,
+        }
+
+    # Calming recovery dip
+    if z_score <= -1.3 and latest_s < 0.30:
+        return {
+            "status": "Significant Uplift",
+            "badge": "🌟 Calm Uplift",
+            "color": "#5ec4a0",
+            "desc": f"Today's check-in shows a restorative calm ({latest_s:.2f}), {-z_score:.1f}σ below your baseline.",
+            "is_recovery": True,
+        }
+
+    # Sustained strain streak
+    recent_tail = daily["S_ema"].tail(3)
+    if len(recent_tail) >= 3 and (recent_tail > tau).all():
+        return {
+            "status": "Sustained Strain",
+            "badge": "🚨 Persistent Strain",
+            "color": "#e06080",
+            "desc": f"Negative affect has remained elevated above threshold ({tau:.2f}) over multiple recent days.",
+            "is_sustained": True,
+        }
+
+    return {
+        "status": "Stable Equilibrium",
+        "badge": "🟢 Stable Baseline",
+        "color": "#7c5cbf",
+        "desc": f"Current affect ({latest_s:.2f}) aligns closely with your personal baseline ({mean_s:.2f}).",
+        "is_normal": True,
+    }
+
+
+# ---------------------------------------------------------------- rule-based recommendations
 SUGGESTIONS = {
     "Stress": ("Try a slow breathing exercise",
-               "Stress seems to be showing up in your recent entries. A few rounds of slow breathing "
-               "(in for 4 seconds, hold for 4, out for 6) can help your body settle."),
-    "Anxiety": ("Try a grounding exercise",
-                "Things may feel on edge lately. Name 5 things you can see, 4 you can feel, 3 you can hear, "
-                "2 you can smell and 1 you can taste."),
-    "Sadness": ("Be gentle with yourself",
-                "Your recent entries sound heavy. Reaching out to someone you trust, or spending a little time "
-                "on something comforting, can help."),
-    "Anger": ("Give yourself some space",
-              "There seems to be some frustration lately. A short walk or writing down what is bothering you "
-              "can create a bit of distance."),
-    "Fear": ("Make the worry smaller",
-             "Worry seems present in your entries. Naming the specific worry and one small next step can make "
-             "it feel more manageable."),
+               "Stress seems present in your recent entries. A few rounds of 4-7-8 breathing "
+               "(inhale for 4s, hold for 7s, exhale slowly for 8s) can calm nervous system activation."),
+    "Anxiety": ("Practice a 5-4-3-2-1 grounding exercise",
+                "Things may feel uncertain or on edge. Ground yourself by naming 5 things you can see, "
+                "4 you can physically feel, 3 you hear, 2 you smell, and 1 you can taste right now."),
+    "Sadness": ("Practice self-compassion and gentle pacing",
+                "Your recent entries feel heavy. Give yourself permission to slow down, reach out to someone "
+                "comforting, or engage in a quiet, low-demand restorative activity."),
+    "Anger": ("Step back for emotional defusion",
+              "Frustration or tension is showing up. A brief walk, sipping cold water, or writing out raw thoughts "
+              "without judgment helps create helpful mental distance."),
+    "Fear": ("Break worries into actionable pieces",
+             "Fear often magnifies uncertainties. Writing down the single immediate worry and identifying "
+             "one tiny concrete step you control can bring back your sense of agency."),
+    "Joy": ("Savor and anchor this positive moment",
+            "You are experiencing positive well-being! Take 30 seconds to intentionally notice and anchor "
+            "what contributed to this calm or happiness today."),
+    "Neutral": ("Steady and balanced headspace",
+                "Your mood is balanced and steady. A great time for focused work, light hobbies, or restorative routines."),
+    "Surprise": ("Reflect and absorb unexpected events",
+                 "Unplanned changes can be stimulating or disorienting. Take a mindful breath to process the new context."),
 }
+
 ESCALATION_TITLE = "Consider talking to someone who can support you"
-ESCALATION_TEXT = ("Over the past days your entries have shown a persistent low mood. This tool cannot diagnose "
-                   "anything, but speaking with a qualified mental-health professional could really help. "
-                   "You do not have to wait until things feel worse.")
+ESCALATION_TEXT = ("Over the past days your entries have shown a persistent pattern of distress. This tool cannot "
+                   "diagnose anything, but speaking with a professional or trusted counselor can make a genuine difference. "
+                   "You do not have to carry everything alone.")
 
 
-def recommend(daily: pd.DataFrame, flags: np.ndarray, tau: float) -> dict:
-    """Level in {none, suggestion, escalation} based on persistence (not on a single message)."""
+def recommend(daily: pd.DataFrame, flags: np.ndarray, tau: float, anomaly: dict | None = None) -> dict:
+    """Generates context-aware, non-diagnostic coping recommendations."""
     if daily.empty:
-        return {"level": "none", "title": "", "text": ""}
+        return {"level": "none", "title": "Welcome to Mood Journal", "text": "Record your first check-in to receive personalized support.", "dominant": "Neutral"}
     last, dom = daily.iloc[-1], daily.iloc[-1]["dominant"]
-    if bool(flags[-1]):
+
+    # Check escalation streak
+    if len(flags) and bool(flags[-1]):
         return {"level": "escalation", "title": ESCALATION_TITLE, "text": ESCALATION_TEXT, "dominant": dom}
-    if dom in SUGGESTIONS and last["S_ema"] > 0.7 * tau:
+
+    # Check acute anomaly spike
+    if anomaly and anomaly.get("is_spike"):
+        t, x = SUGGESTIONS.get("Stress", ("Take a mindful pause", "A sudden wave of tension was detected."))
+        return {"level": "suggestion", "title": f"⚡ Acute Surge: {t}", "text": x, "dominant": dom}
+
+    if dom in SUGGESTIONS and last["S_ema"] > 0.65 * tau:
         t, x = SUGGESTIONS[dom]
         return {"level": "suggestion", "title": t, "text": x, "dominant": dom}
-    return {"level": "none", "title": "Nothing to flag right now",
-            "text": "Your recent entries do not show a persistent pattern of low mood.", "dominant": dom}
+
+    if dom in ["Joy", "Neutral", "Surprise"]:
+        t, x = SUGGESTIONS[dom]
+        return {"level": "none", "title": f"✨ {t}", "text": x, "dominant": dom}
+
+    return {"level": "none", "title": "Steady Emotional State",
+            "text": "Your entries do not show persistent distress. Continue nurturing daily well-being.", "dominant": dom}

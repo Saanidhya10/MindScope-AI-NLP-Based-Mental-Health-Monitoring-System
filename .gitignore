@@ -95,3 +95,18 @@ Thumbs.db
 .vscode/*
 !.vscode/settings.json
 *.swp
+
+# ---------- Scratch / Temporary Artifacts ----------
+.chrome_data/
+test_rf.zip
+paragraphs_inventory.txt
+extracted_report/
+NLP_Mental_Health_Monitoring_Project.zip
+/Minor_Project_Report_66_Pages.docx
+/Humanized_Minor_Project_Report.docx
+/Humanized_Minor_Project_Report.pdf
+/Minor_Project_Report_Updated_66_Pages.docx
+/Minor_Project_Report_Updated_66_Pages.pdf
+/Humanized_Minor_Project_Report.md
+/humanize_in_place.py
+/report_generator/
