@@ -74,6 +74,10 @@ _CSS = """
 .stApp .mj-fill { height: 100%; border-radius: 999px; transform-origin: left; animation: mj-grow 0.7s cubic-bezier(.2,.7,.2,1) both; }
 @keyframes mj-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .stApp .mj-empty { color: var(--muted); font-size: 1rem; line-height: 1.55; padding: 1.5rem 0; max-width: 40ch; }
+.stApp .mj-heard-label { font-size: 0.9rem; color: var(--muted); margin: 0 0 0.3rem; }
+.stApp .mj-heard { font-family: var(--serif) !important; font-size: 1.05rem; line-height: 1.55; color: var(--ink);
+  border-left: 3px solid var(--rule); margin: 0 0 0.8rem; padding: 0.1rem 0 0.1rem 0.9rem; max-width: 60ch; }
+.stApp .mj-tone { font-size: 0.95rem; line-height: 1.5; color: var(--ink); margin: 0 0 1.1rem; max-width: 60ch; }
 .stApp .mj-model { color: var(--muted); font-size: 0.85rem; margin-top: 1rem; }
 
 /* ---- crisis + status ---- */
@@ -157,7 +161,29 @@ def _reading(probs: np.ndarray) -> tuple[str, str]:
     return headline, note
 
 
-def entry_result(probs: np.ndarray, crisis: bool, helplines: list[dict], model_label: str) -> None:
+TONE_WORDS = {"Neutral": "calm", "Joy": "upbeat", "Anger": "tense", "Sadness": "low"}
+
+
+def _voice_block(voice: dict) -> str:
+    """What Whisper heard, and how the voice sounded."""
+    html = (f'<p class="mj-heard-label">What the app heard ({voice["seconds"]:.0f} seconds)</p>'
+            f'<blockquote class="mj-heard">{escape(voice["transcript"])}</blockquote>')
+    tone = voice.get("tone")
+    if tone is None:
+        return html + '<p class="mj-tone">Tone of voice wasn\'t read for this entry.</p>'
+    order = [i for i in np.argsort(tone)[::-1] if tone[i] > 0]
+    top = LABELS[order[0]]
+    parts = ", ".join(f"{TONE_WORDS[LABELS[i]]} {tone[i] * 100:.0f}%" for i in order)
+    effect = ("Your tone pointed to more difficult feelings than your words, so it was added to the reading."
+              if voice.get("tone_used") else
+              "The reading is based on your words. Tone is only added when it points to more difficult feelings, "
+              "never to fewer.")
+    return html + (f'<p class="mj-tone">Your voice sounded mostly <strong>{TONE_WORDS[top]}</strong> '
+                   f'<span class="mj-num">({parts})</span>. {effect}</p>')
+
+
+def entry_result(probs: np.ndarray, crisis: bool, helplines: list[dict], model_label: str,
+                 voice: dict | None = None) -> None:
     if crisis:
         lines = "".join(f'<li><strong>{escape(h["name"])}</strong> <span class="mj-num">{escape(h["number"])}</span>'
                         f'<span>{escape(h.get("note", ""))}</span></li>' for h in helplines)
@@ -173,9 +199,14 @@ def entry_result(probs: np.ndarray, crisis: bool, helplines: list[dict], model_l
         f'<span class="val">{p * 100:.0f}%</span>'
         for e, p in sorted(zip(LABELS, map(float, probs)), key=lambda x: -x[1])
     )
+    model_note = f"Read by the {escape(model_label)} model"
+    if voice is not None:
+        model_note += ", from a transcript made with Whisper" + (" and a speech-emotion model for tone" if voice.get(
+            "tone") is not None else "")
     _md(f'<p class="mj-reading">{headline}</p><p class="mj-certainty">{note}</p>'
-        f'<div class="mj-bars" role="list" aria-label="Emotion scores">{rows}</div>'
-        f'<p class="mj-model">Read by the {escape(model_label)} model.</p>')
+        + (_voice_block(voice) if voice is not None else "")
+        + f'<div class="mj-bars" role="list" aria-label="Emotion scores">{rows}</div>'
+        f'<p class="mj-model">{model_note}.</p>')
 
 
 def entry_placeholder() -> None:

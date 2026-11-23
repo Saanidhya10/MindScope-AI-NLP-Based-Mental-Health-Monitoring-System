@@ -37,6 +37,11 @@ evaluate>=0.4
 sentencepiece>=0.1.99       # needed by MarianMT tokenizers
 sacremoses>=0.0.53          # needed by MarianMT tokenizers
 
+# --- Voice entries (src/voice.py, English only) ------------------------------
+faster-whisper>=1.0         # speech -> text (Whisper, runs locally on CPU)
+soundfile>=0.12             # read recorded audio
+# Tone of voice uses superb/wav2vec2-base-superb-er via transformers (above)
+
 # --- Text augmentation -------------------------------------------------------
 nlpaug>=1.1.11              # synonym replacement (WordNet)
 # Back-translation (en->fr->en) uses MarianMT via transformers (Helsinki-NLP/opus-mt-*)

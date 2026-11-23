@@ -378,6 +378,21 @@ app:
   max_input_chars: 1000
 
 # -----------------------------------------------------------------------------
+# Voice entries (src/voice.py), English only. Recordings are processed in memory and never saved.
+# -----------------------------------------------------------------------------
+voice:
+  asr_model: small.en                  # faster-whisper English-only model (~0.5 GB, downloaded on first use)
+  asr_compute_type: int8               # fast on CPU
+  max_seconds: 180
+  min_words: 3
+  # Tone of voice: pretrained speech-emotion model (IEMOCAP, 4 classes) mapped onto our classes
+  tone_model: superb/wav2vec2-base-superb-er
+  tone_labels: { neu: Neutral, hap: Joy, ang: Anger, sad: Sadness }
+  # Weight of tone in the blend. One-directional: tone can add evidence of distress but never
+  # lowers the difficult-feelings share of what was said (acted-speech models are unreliable on real voices).
+  tone_weight: 0.25
+
+# -----------------------------------------------------------------------------
 # Inference
 # -----------------------------------------------------------------------------
 inference:
