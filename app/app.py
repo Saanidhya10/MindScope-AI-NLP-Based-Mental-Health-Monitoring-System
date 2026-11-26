@@ -29,6 +29,7 @@ pages = {
     "Track": [st.Page(VIEWS / "checkin.py", title="Daily check-in", icon=":material/fact_check:"),
               st.Page(VIEWS / "activities.py", title="Wellness activities", icon=":material/self_improvement:")],
     "Insights": [st.Page(VIEWS / "profile.py", title="Emotional profile", icon=":material/fingerprint:"),
+                 st.Page(VIEWS / "outlook.py", title="Outlook", icon=":material/trending_up:"),
                  st.Page(VIEWS / "triggers.py", title="Triggers", icon=":material/topic:")],
     "Account": [st.Page(VIEWS / "settings.py", title="Settings & privacy", icon=":material/shield_person:")],
 }

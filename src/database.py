@@ -233,6 +233,25 @@ class MoodDatabase:
             return pd.read_sql("SELECT id, timestamp, body FROM notes WHERE user_id=? AND kind=? ORDER BY id DESC",
                                c, params=(user_id, kind))
 
+    # ---- saved outlooks ---------------------------------------------------------------
+    def save_forecasts(self, user_id: str, made_on, outlooks) -> None:
+        """Store today's outlooks once (later calls on the same day are ignored)."""
+        self._require_consent(user_id)
+        made = pd.Timestamp(made_on).date().isoformat()
+        with self._conn() as c:
+            c.executemany("INSERT OR IGNORE INTO forecasts (user_id, made_on, target_day, predicted, low, high) "
+                          "VALUES (?,?,?,?,?,?)",
+                          [(user_id, made, pd.Timestamp(o.day).date().isoformat(), o.predicted, o.low, o.high)
+                           for o in outlooks])
+
+    def get_forecasts(self, user_id: str) -> pd.DataFrame:
+        with self._conn() as c:
+            df = pd.read_sql("SELECT made_on, target_day, predicted, low, high FROM forecasts WHERE user_id=? "
+                             "ORDER BY made_on, target_day", c, params=(user_id,))
+        for col in ("made_on", "target_day"):
+            df[col] = pd.to_datetime(df[col])
+        return df
+
     def list_users(self) -> list[str]:
         with self._conn() as c:
             return [r[0] for r in c.execute("SELECT user_id FROM users ORDER BY user_id")]

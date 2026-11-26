@@ -378,6 +378,13 @@ app:
   max_input_chars: 1000
 
 # -----------------------------------------------------------------------------
+# Emotional outlook (src/forecast.py), EXPERIMENTAL: trained and evaluated on simulated timelines
+# -----------------------------------------------------------------------------
+forecast:
+  model_path: models/forecast/forecaster.joblib   # built on first use (~15 s) from simulated timelines
+  min_days: 7                          # days with entries in the last 14 needed before showing an outlook
+
+# -----------------------------------------------------------------------------
 # Trigger analysis (src/triggers.py): what an entry seems to be about. Evaluate: scripts/eval_triggers.py
 # -----------------------------------------------------------------------------
 triggers:

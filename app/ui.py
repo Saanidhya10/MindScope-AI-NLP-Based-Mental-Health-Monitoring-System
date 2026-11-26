@@ -122,6 +122,10 @@ _CSS = """
 .stApp .mj-chip { display: inline-block; background: #E2ECEE; color: var(--ink); border-radius: 999px;
   padding: 0.1rem 0.65rem; margin: 0 0.3rem 0.3rem 0; font-size: 0.88rem; }
 .stApp .mj-sub { color: var(--muted); font-size: 0.85rem; }
+.stApp .mj-outlook { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 1.1rem 1.25rem; }
+.stApp .mj-outlook-label { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.2rem; }
+.stApp .mj-outlook-head { font-family: var(--serif) !important; font-size: 1.35rem; line-height: 1.3; margin: 0 0 0.4rem; }
+.stApp .mj-outlook-body { color: var(--ink); font-size: 0.95rem; line-height: 1.5; margin: 0; }
 .stApp .mj-footer { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin-top: 3.5rem; padding-top: 1rem;
   border-top: 1px solid var(--rule); max-width: 80ch; }
 
@@ -498,6 +502,39 @@ def mix_compare(usual: pd.Series, recent: pd.Series) -> None:
     fig.update_yaxes(autorange="reversed", tickfont=dict(color=INK))
     fig = _layout(fig, 60 + 46 * len(order))
     fig.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.12, x=0, font=dict(color=MUTED)))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def outlook_cards(cards: list[tuple[str, str, str]]) -> None:
+    cols = st.columns(len(cards), gap="medium")
+    for col, (label, head, body) in zip(cols, cards):
+        with col:
+            _md(f'<div class="mj-outlook"><p class="mj-outlook-label">{escape(label)}</p>'
+                f'<p class="mj-outlook-head">{escape(head)}</p><p class="mj-outlook-body">{escape(body)}</p></div>')
+
+
+def outlook_chart(obs: pd.Series, outlooks, tau: float) -> None:
+    """Observed daily difficult share, then the outlook with its 80% range."""
+    xs = [o.day for o in outlooks]
+    start = [obs.index[-1]] if len(obs) else []
+    first = [float(obs.iloc[-1]) * 100] if len(obs) else []
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=start + xs + xs[::-1] + start, fill="toself", fillcolor="rgba(45,95,115,0.14)",
+                             y=first + [o.high * 100 for o in outlooks] + [o.low * 100 for o in outlooks][::-1] + first,
+                             mode="lines", line=dict(width=0), hoverinfo="skip", name="Expected range"))
+    fig.add_trace(go.Scatter(x=obs.index, y=obs * 100, mode="lines+markers", name="Your days",
+                             line=dict(color=LAKE, width=2.5), marker=dict(size=6),
+                             hovertemplate="%{x|%d %b}: %{y:.0f}%<extra></extra>"))
+    fig.add_trace(go.Scatter(x=start + xs, y=first + [o.predicted * 100 for o in outlooks], mode="lines+markers",
+                             name="Outlook", line=dict(color=LAKE, width=2, dash="dot"), marker=dict(size=5),
+                             hovertemplate="%{x|%d %b}: about %{y:.0f}%<extra></extra>"))
+    fig.add_hline(y=tau * 100, line=dict(color=LEVEL_COLORS["support"], width=1, dash="dot"),
+                  annotation=dict(text="Support line", font=dict(color=LEVEL_COLORS["support"], size=12)),
+                  annotation_position="top left")
+    fig.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="#DDE4E2", zeroline=False, tickfont=dict(color=MUTED))
+    fig.update_xaxes(showgrid=False, tickformat="%d %b", tickfont=dict(color=MUTED), linecolor=RULE)
+    fig = _layout(fig, 320)
+    fig.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.15, x=0, font=dict(color=MUTED)))
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
