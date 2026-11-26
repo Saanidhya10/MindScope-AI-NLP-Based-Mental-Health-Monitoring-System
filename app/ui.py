@@ -118,8 +118,10 @@ _CSS = """
 .stApp .mj-table { border-collapse: collapse; width: 100%; max-width: 760px; background: var(--surface); font-size: 0.95rem; }
 .stApp .mj-table th { text-align: left; font-weight: 600; padding: 0.55rem 0.8rem; border-bottom: 2px solid var(--rule); }
 .stApp .mj-table td { padding: 0.5rem 0.8rem; border-bottom: 1px solid #E2E8E7; }
+.stApp .mj-table td.mj-num, .stApp .mj-table th { white-space: nowrap; }
 .stApp .mj-chip { display: inline-block; background: #E2ECEE; color: var(--ink); border-radius: 999px;
   padding: 0.1rem 0.65rem; margin: 0 0.3rem 0.3rem 0; font-size: 0.88rem; }
+.stApp .mj-sub { color: var(--muted); font-size: 0.85rem; }
 .stApp .mj-footer { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin-top: 3.5rem; padding-top: 1rem;
   border-top: 1px solid var(--rule); max-width: 80ch; }
 
@@ -463,6 +465,40 @@ def trigger_table(entries: pd.DataFrame) -> None:
         for r in entries.itertuples())
     _md('<table class="mj-table"><thead><tr><th>Day</th><th>Main feeling</th><th>Topics</th></tr></thead>'
         f"<tbody>{rows}</tbody></table>")
+
+
+def profile_table(dims) -> None:
+    """Usual vs recent per dimension, with a plain-words change column coloured by whether it's a better direction."""
+    rows = []
+    for d in dims:
+        if d.change in ("higher", "lower"):
+            good = d.change == d.better
+            color = LEVEL_COLORS["steady"] if good else LEVEL_COLORS["watch"]
+            change = f'<span style="color:{color}; font-weight:600">{d.change.capitalize()} than usual</span>'
+        elif d.change == "similar":
+            change = '<span style="color: var(--muted)">About the same</span>'
+        else:
+            change = ""
+        rows.append(f"<tr><td><strong>{escape(d.name)}</strong><br><span class='mj-sub'>{escape(d.note)}</span></td>"
+                    f"<td class='mj-num'>{escape(d.usual)}</td><td class='mj-num'>{escape(d.recent)}</td>"
+                    f"<td>{change}</td></tr>")
+    _md('<table class="mj-table"><thead><tr><th></th><th>Usual</th><th>Last 7 days</th><th></th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table>")
+
+
+def mix_compare(usual: pd.Series, recent: pd.Series) -> None:
+    order = [e for e in LABELS if usual.get(e, 0) + recent.get(e, 0) > 0.02]
+    fig = go.Figure()
+    fig.add_trace(go.Bar(y=order, x=[usual.get(e, 0) * 100 for e in order], orientation="h", name="Usual",
+                         marker_color="#B9CBCE", hovertemplate="%{y}: %{x:.0f}% usually<extra></extra>"))
+    fig.add_trace(go.Bar(y=order, x=[recent.get(e, 0) * 100 for e in order], orientation="h", name="Last 7 days",
+                         marker_color=LAKE, hovertemplate="%{y}: %{x:.0f}% recently<extra></extra>"))
+    fig.update_layout(barmode="group")
+    fig.update_xaxes(ticksuffix="%", gridcolor="#DDE4E2", tickfont=dict(color=MUTED))
+    fig.update_yaxes(autorange="reversed", tickfont=dict(color=INK))
+    fig = _layout(fig, 60 + 46 * len(order))
+    fig.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.12, x=0, font=dict(color=MUTED)))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 def footer(model_label: str) -> None:
