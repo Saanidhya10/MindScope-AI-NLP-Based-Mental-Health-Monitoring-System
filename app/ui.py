@@ -110,6 +110,14 @@ _CSS = """
 .stApp .mj-insights { margin: 0 0 1rem; padding: 0; list-style: none; max-width: 62ch; }
 .stApp .mj-insights li { padding: 0.6rem 0 0.6rem 0.9rem; border-left: 3px solid var(--lake); margin-bottom: 0.5rem;
   background: var(--surface); line-height: 1.5; }
+[class*="st-key-mj-act-"] { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 1rem 1.1rem; height: 100%; }
+.stApp .mj-act-title { font-family: var(--serif) !important; font-size: 1.2rem; font-weight: 600; margin: 0 0 0.2rem; }
+.stApp .mj-act-meta { color: var(--lake); font-size: 0.88rem; margin: 0 0 0.5rem; }
+.stApp .mj-act-summary { color: var(--muted); font-size: 0.95rem; line-height: 1.45; margin: 0 0 0.4rem; }
+.stApp .mj-table { border-collapse: collapse; width: 100%; max-width: 760px; background: var(--surface); font-size: 0.95rem; }
+.stApp .mj-table th { text-align: left; font-weight: 600; padding: 0.55rem 0.8rem; border-bottom: 2px solid var(--rule); }
+.stApp .mj-table td { padding: 0.5rem 0.8rem; border-bottom: 1px solid #E2E8E7; }
 .stApp .mj-footer { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin-top: 3.5rem; padding-top: 1rem;
   border-top: 1px solid var(--rule); max-width: 80ch; }
 
@@ -342,6 +350,77 @@ def checkin_chart(df: pd.DataFrame) -> None:
     fig = _layout(fig, 280)
     fig.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2, x=0, font=dict(color=MUTED)))
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def activity_card(act, reason: str) -> None:
+    _md(f'<p class="mj-act-title">{escape(act.title)}</p>'
+        f'<p class="mj-act-meta">{escape(reason)}. About {act.minutes} minutes.</p>'
+        f'<p class="mj-act-summary">{escape(act.summary)}</p>')
+
+
+def breathing_guide(phases: list[tuple[str, int]]) -> None:
+    """CSS-only breathing circle: grows while breathing in, holds, shrinks while breathing out.
+    With reduced motion the circle stays still and the phases are listed instead."""
+    total = sum(sec for _, sec in phases)
+    scale_frames, label_rules, t = [], [], 0.0
+    size = 0.55
+    for i, (name, sec) in enumerate(phases):
+        start, end = 100 * t / total, 100 * (t + sec) / total
+        if name == "Breathe in":
+            size_end = 1.0
+        elif name == "Breathe out":
+            size_end = 0.55
+        else:
+            size_end = size
+        scale_frames.append(f"{start:.2f}% {{ transform: scale({size}); }} {end:.2f}% {{ transform: scale({size_end}); }}")
+        size = size_end
+        label_rules.append(
+            f"@keyframes mj-lab{i} {{ 0%, {max(start - 0.01, 0):.2f}% {{ opacity: 0; }} {start:.2f}%, {end - 0.5:.2f}% "
+            f"{{ opacity: 1; }} {end:.2f}%, 100% {{ opacity: 0; }} }} "
+            f".mj-breath-lab{i} {{ animation: mj-lab{i} {total}s linear infinite; }}")
+        t += sec
+    labels = "".join(f'<span class="mj-breath-lab mj-breath-lab{i}">{escape(n)} ({sec}s)</span>'
+                     for i, (n, sec) in enumerate(phases))
+    steps = " → ".join(f"{n} for {sec}" for n, sec in phases)
+    st.html(f"""<style>
+@keyframes mj-breath {{ {' '.join(scale_frames)} }}
+{' '.join(label_rules)}
+.mj-breath {{ position: relative; height: 260px; display: flex; align-items: center; justify-content: center; }}
+.mj-breath-circle {{ width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, #CFE0E2, #8FB6BD);
+  animation: mj-breath {total}s ease-in-out infinite; }}
+.mj-breath-lab {{ position: absolute; font-family: 'Literata', Georgia, serif; font-size: 1.35rem; color: #18262B; opacity: 0; }}
+.mj-breath-static {{ display: none; font-family: 'Lexend', sans-serif; color: #18262B; }}
+@media (prefers-reduced-motion: reduce) {{
+  .mj-breath-circle, .mj-breath-lab {{ animation: none; }} .mj-breath-lab {{ display: none; }}
+  .mj-breath-static {{ display: block; position: absolute; }} }}
+</style>
+<div class="mj-breath" role="img" aria-label="Breathing guide: {escape(steps)}">
+  <div class="mj-breath-circle"></div>{labels}<span class="mj-breath-static">{escape(steps)}</span>
+</div>""")
+
+
+def timer_bar(seconds: int) -> None:
+    """A bar that fills over `seconds` (CSS only), for timed exercises."""
+    st.html(f"""<style>
+@keyframes mj-fillbar {{ from {{ width: 0; }} to {{ width: 100%; }} }}
+.mj-timer {{ height: 8px; background: #E2E8E7; border-radius: 999px; overflow: hidden; margin: 4px 0 4px; }}
+.mj-timer div {{ height: 100%; background: #2D5F73; animation: mj-fillbar {seconds}s linear forwards; }}
+@media (prefers-reduced-motion: reduce) {{ .mj-timer div {{ animation: none; width: 0; }} }}
+</style><div class="mj-timer" role="progressbar" aria-label="{seconds // 60} minute timer"><div></div></div>
+<p style="font-family: Lexend, sans-serif; color: #56656A; font-size: 0.9rem; margin: 0;">
+About {seconds // 60} minutes. The bar fills as you go.</p>""")
+
+
+def activity_stats(stats: pd.DataFrame) -> None:
+    from src.activities import BY_KEY
+
+    rows = "".join(
+        f"<tr><td>{escape(BY_KEY[k].title) if k in BY_KEY else escape(k)}</td><td class='mj-num'>{int(r['done'])}</td>"
+        f"<td class='mj-num'>{int(r['helped'])} of {int(r['helped'] + r['not_helped'])}</td>"
+        f"<td class='mj-num'>{'' if pd.isna(r['mood_change']) else f'{r.mood_change:+.1f}'}</td></tr>"
+        for k, r in stats.sort_values("done", ascending=False).iterrows())
+    _md('<table class="mj-table"><thead><tr><th>Activity</th><th>Times done</th><th>Helped</th>'
+        f'<th>Average mood change</th></tr></thead><tbody>{rows}</tbody></table>')
 
 
 def footer(model_label: str) -> None:

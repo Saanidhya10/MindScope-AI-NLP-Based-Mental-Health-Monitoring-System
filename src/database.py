@@ -174,6 +174,55 @@ class MoodDatabase:
         df["day"] = pd.to_datetime(df["day"])
         return df.drop(columns=["user_id"]).set_index("day")
 
+    # ---- wellness activities, goals and journal notes --------------------------------
+    def _require_consent(self, user_id: str) -> None:
+        if not self.has_consent(user_id):
+            raise PermissionError(f"User '{user_id}' has not granted consent; nothing was stored.")
+
+    def log_activity(self, user_id: str, activity: str, mood_before: int | None, mood_after: int | None,
+                     helpful: bool | None, timestamp=None) -> None:
+        self._require_consent(user_id)
+        ts = pd.Timestamp(timestamp or datetime.now()).isoformat(timespec="seconds")
+        with self._conn() as c:
+            c.execute("INSERT INTO activity_log (user_id, timestamp, activity, mood_before, mood_after, helpful) "
+                      "VALUES (?,?,?,?,?,?)", (user_id, ts, activity, mood_before, mood_after,
+                                               None if helpful is None else int(helpful)))
+
+    def get_activity_log(self, user_id: str) -> pd.DataFrame:
+        with self._conn() as c:
+            return pd.read_sql("SELECT timestamp, activity, mood_before, mood_after, helpful FROM activity_log "
+                               "WHERE user_id=? ORDER BY timestamp", c, params=(user_id,))
+
+    def add_goal(self, user_id: str, title: str) -> None:
+        self._require_consent(user_id)
+        with self._conn() as c:
+            c.execute("INSERT INTO goals (user_id, created, title) VALUES (?,?,?)", (user_id, _now(), title.strip()))
+
+    def get_goals(self, user_id: str) -> pd.DataFrame:
+        with self._conn() as c:
+            return pd.read_sql("SELECT id, created, title, done FROM goals WHERE user_id=? ORDER BY done, id",
+                               c, params=(user_id,))
+
+    def set_goal_done(self, user_id: str, goal_id: int, done: bool) -> None:
+        with self._conn() as c:
+            c.execute("UPDATE goals SET done=? WHERE id=? AND user_id=?", (int(done), goal_id, user_id))
+
+    def delete_goal(self, user_id: str, goal_id: int) -> None:
+        with self._conn() as c:
+            c.execute("DELETE FROM goals WHERE id=? AND user_id=?", (goal_id, user_id))
+
+    def add_note(self, user_id: str, kind: str, body: str) -> None:
+        """Gratitude / thought journal text. Only called when the user has opted in to saving notes."""
+        self._require_consent(user_id)
+        with self._conn() as c:
+            c.execute("INSERT INTO notes (user_id, timestamp, kind, body) VALUES (?,?,?,?)",
+                      (user_id, _now(), kind, body))
+
+    def get_notes(self, user_id: str, kind: str) -> pd.DataFrame:
+        with self._conn() as c:
+            return pd.read_sql("SELECT id, timestamp, body FROM notes WHERE user_id=? AND kind=? ORDER BY id DESC",
+                               c, params=(user_id, kind))
+
     def list_users(self) -> list[str]:
         with self._conn() as c:
             return [r[0] for r in c.execute("SELECT user_id FROM users ORDER BY user_id")]
