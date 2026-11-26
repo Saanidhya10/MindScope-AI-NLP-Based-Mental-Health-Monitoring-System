@@ -126,6 +126,13 @@ _CSS = """
 .stApp .mj-outlook-label { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.2rem; }
 .stApp .mj-outlook-head { font-family: var(--serif) !important; font-size: 1.35rem; line-height: 1.3; margin: 0 0 0.4rem; }
 .stApp .mj-outlook-body { color: var(--ink); font-size: 0.95rem; line-height: 1.5; margin: 0; }
+.stApp .mj-rec { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 0.95rem 1.15rem; margin-bottom: 0.7rem; max-width: 70ch; }
+.stApp .mj-rec-title { font-family: var(--serif) !important; font-size: 1.12rem; font-weight: 600; margin: 0 0 0.3rem; }
+.stApp .mj-rec-body { line-height: 1.55; margin: 0 0 0.4rem; }
+.stApp .mj-rec-why { color: var(--lake); font-size: 0.9rem; margin: 0 0 0.25rem; }
+.stApp .mj-rec-src { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.stApp .mj-rec-src a { color: var(--lake); }
 .stApp .mj-footer { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin-top: 3.5rem; padding-top: 1rem;
   border-top: 1px solid var(--rule); max-width: 80ch; }
 
@@ -536,6 +543,19 @@ def outlook_chart(obs: pd.Series, outlooks, tau: float) -> None:
     fig = _layout(fig, 320)
     fig.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.15, x=0, font=dict(color=MUTED)))
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def rec_list(recs: list[dict]) -> None:
+    """Library suggestions: title, summary, why it was suggested, and the source it's based on."""
+    items = []
+    for r in recs:
+        e = r["entry"]
+        why = f'<p class="mj-rec-why">{escape(r["reason"])}.</p>' if r.get("reason") else ""
+        items.append(f'<div class="mj-rec"><p class="mj-rec-title">{escape(e["title"])}</p>'
+                     f'<p class="mj-rec-body">{escape(e["summary"])}</p>{why}'
+                     f'<p class="mj-rec-src">Based on <a href="{escape(e["url"])}" target="_blank" rel="noopener">'
+                     f'{escape(e["source"])}</a></p></div>')
+    _md("".join(items))
 
 
 def footer(model_label: str) -> None:

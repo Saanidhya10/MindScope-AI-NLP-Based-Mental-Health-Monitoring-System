@@ -385,6 +385,17 @@ forecast:
   min_days: 7                          # days with entries in the last 14 needed before showing an outlook
 
 # -----------------------------------------------------------------------------
+# Evidence-based recommendations (src/knowledge.py): retrieval over a curated, sourced library
+# -----------------------------------------------------------------------------
+knowledge:
+  library: data/knowledge/wellness_kb.yaml
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2   # ~90 MB, runs locally
+  cache_dir: models/knowledge
+  emotion_boost: 0.10                  # added when an entry is tagged for the entry's main feeling (half for the 2nd)
+  topic_boost: 0.12                    # added per matching topic (up to two)
+  per_entry: 3                         # suggestions shown under a journal entry
+
+# -----------------------------------------------------------------------------
 # Trigger analysis (src/triggers.py): what an entry seems to be about. Evaluate: scripts/eval_triggers.py
 # -----------------------------------------------------------------------------
 triggers:

@@ -1,9 +1,11 @@
 """Journal: write or record an entry and see what came through."""
+import numpy as np
 import streamlit as st
 
 import common
 import ui
 from src import recommend
+from src.utils import LABELS
 from src.voice import fuse, load_audio
 
 cfg, db, uid = common.get_cfg(), common.get_db(), common.user_id()
@@ -21,8 +23,13 @@ def save_entry(text: str, voice_info: dict | None = None, tone=None) -> None:
     db.add_prediction(uid, probs, triggers=found)
     if voice_info is not None:
         voice_info.update(tone=tone, tone_used=used)
-    st.session_state["last"] = {"probs": probs, "crisis": recommend.check_crisis(text, cfg), "voice": voice_info,
-                                "triggers": found}
+    crisis = recommend.check_crisis(text, cfg)
+    recs = []
+    if not crisis:  # crisis messages get helplines only, never generic tips
+        top = [LABELS[i] for i in np.argsort(probs)[::-1][:2]]
+        recs = common.get_knowledge().recommend(text, top, found, k=cfg["knowledge"]["per_entry"])
+    st.session_state["last"] = {"probs": probs, "crisis": crisis, "voice": voice_info, "triggers": found,
+                                "recs": recs}
     st.toast("Entry analysed and saved")
     st.rerun()
 
@@ -78,6 +85,10 @@ with right:
         last = st.session_state["last"]
         ui.entry_result(last["probs"], last["crisis"], common.helplines(), common.get_predictor().label, last["voice"],
                         last.get("triggers"))
+        if last.get("recs"):
+            ui.section("Suggestions for this entry", "From MindScope's wellness library. Each one links to the public "
+                                                     "guidance it's based on.")
+            ui.rec_list(last["recs"])
     else:
         ui.entry_placeholder()
 

@@ -31,6 +31,7 @@ pages = {
     "Insights": [st.Page(VIEWS / "profile.py", title="Emotional profile", icon=":material/fingerprint:"),
                  st.Page(VIEWS / "outlook.py", title="Outlook", icon=":material/trending_up:"),
                  st.Page(VIEWS / "triggers.py", title="Triggers", icon=":material/topic:")],
+    "Support": [st.Page(VIEWS / "knowledge.py", title="Knowledge centre", icon=":material/menu_book:")],
     "Account": [st.Page(VIEWS / "settings.py", title="Settings & privacy", icon=":material/shield_person:")],
 }
 st.navigation(pages).run()

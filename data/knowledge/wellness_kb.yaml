@@ -1,0 +1,332 @@
+# MindScope AI knowledge library: short, practical wellness guidance with the public source each entry is based on.
+# Written for MindScope from the linked pages (paraphrased, not copied). Non-diagnostic, no medication advice.
+# Tags: emotions (Joy, Sadness, Anger, Fear, Anxiety, Stress, Surprise, Neutral) and topics (src/triggers.py keys).
+# Source links checked on 2026-11-26. Re-check before a demo; pages move.
+
+- id: box-breathing
+  title: Slow your breathing to calm your body
+  summary: >-
+    Breathe in gently through your nose, then let the breath out slowly through your mouth, a little longer than the
+    in-breath. Keep a steady rhythm for three to five minutes. Slow breathing can ease the physical side of stress,
+    like a racing heart or tight chest.
+  emotions: [Stress, Anxiety, Anger, Fear]
+  topics: []
+  source: NHS, Breathing exercises for stress
+  url: https://www.nhs.uk/mental-health/self-help/guides-tools-and-activities/breathing-exercises-for-stress/
+
+- id: stress-control
+  title: Take control of the parts you can
+  summary: >-
+    Write down what is causing stress and sort it into things you can act on and things you can't. Pick one small
+    action for something you can change today. Feeling in control of even one part tends to make the rest feel more
+    manageable.
+  emotions: [Stress, Anxiety]
+  topics: [work, academic, money]
+  source: NHS, Tips to reduce stress
+  url: https://www.nhs.uk/mental-health/self-help/guides-tools-and-activities/tips-to-reduce-stress/
+
+- id: stress-signs
+  title: Notice your own signs of stress early
+  summary: >-
+    Stress often shows up as irritability, poor sleep, headaches or finding it hard to switch off. Spotting your own
+    early signs means you can step in sooner, with a break, some movement or talking to someone, before it builds up.
+  emotions: [Stress, Anger]
+  topics: [work, health]
+  source: NHS Every Mind Matters, Stress
+  url: https://www.nhs.uk/every-mind-matters/mental-health-issues/stress/
+
+- id: stress-nimh
+  title: Look after the basics when you're stretched
+  summary: >-
+    When stress lasts, regular sleep, meals, movement and short relaxing activities matter more, not less. Set
+    priorities, decide what can wait, and say no to new commitments where you can. If stress keeps you from daily life
+    for weeks, talk to a health professional.
+  emotions: [Stress, Anxiety]
+  topics: [work, academic, health]
+  source: NIMH, I'm So Stressed Out! fact sheet
+  url: https://www.nimh.nih.gov/health/publications/so-stressed-out-fact-sheet
+
+- id: who-grounding
+  title: Ground yourself when you feel hooked by worries
+  summary: >-
+    When difficult thoughts pull you in, slow down and notice the world around you: press your feet into the floor,
+    look at five things around you, and listen to the sounds in the room. Then turn your attention back to what you
+    were doing.
+  emotions: [Anxiety, Fear, Stress]
+  topics: []
+  source: WHO, Doing What Matters in Times of Stress
+  url: https://www.who.int/publications/i/item/9789240003927
+
+- id: who-values
+  title: Do one small thing that matters to you
+  summary: >-
+    Even on a hard day, picking one small action that fits what you care about, such as helping someone, finishing a
+    task or calling family, can give a sense of direction. Small steps count.
+  emotions: [Sadness, Stress, Neutral]
+  topics: [self, family]
+  source: WHO, Doing What Matters in Times of Stress
+  url: https://www.who.int/publications/i/item/9789240003927
+
+- id: anxiety-worry-time
+  title: Give worries a set time
+  summary: >-
+    Set aside 15 minutes a day as worry time. When a worry comes up at other times, jot it down and come back to it
+    then. Many people find worries feel smaller and fewer by the time they look at them.
+  emotions: [Anxiety, Fear]
+  topics: [academic, work, self]
+  source: NHS, Anxiety, fear and panic
+  url: https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/anxiety-fear-panic/
+
+- id: anxiety-face-it
+  title: Approach what you fear in small steps
+  summary: >-
+    Avoiding situations that make you anxious can make the fear grow. Try facing a smaller version first and build up
+    gradually. If anxiety is affecting your daily life most days, it's worth talking to a professional.
+  emotions: [Anxiety, Fear]
+  topics: [social, academic, work]
+  source: NHS, Anxiety, fear and panic
+  url: https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/anxiety-fear-panic/
+
+- id: cbt-thoughts
+  title: Check unhelpful thoughts against the evidence
+  summary: >-
+    Write down a thought that's bothering you, then list what supports it and what doesn't. Try writing a more
+    balanced version. This is a common self-help technique from cognitive behavioural therapy (CBT).
+  emotions: [Anxiety, Sadness, Anger, Fear]
+  topics: [self, academic, work]
+  source: NHS Every Mind Matters, Self-help CBT techniques
+  url: https://www.nhs.uk/every-mind-matters/mental-wellbeing-tips/self-help-cbt-techniques/
+
+- id: cbt-problem-solving
+  title: Break a problem into steps
+  summary: >-
+    Name the problem clearly, list a few possible solutions, pick one, and plan the first step. Doing something
+    concrete, however small, often lifts the feeling of being stuck.
+  emotions: [Stress, Anxiety, Sadness]
+  topics: [academic, work, money]
+  source: NHS Every Mind Matters, Self-help CBT techniques
+  url: https://www.nhs.uk/every-mind-matters/mental-wellbeing-tips/self-help-cbt-techniques/
+
+- id: exams-plan
+  title: Plan revision in short, regular sessions
+  summary: >-
+    Make a simple timetable with short revision blocks and breaks, and start early rather than cramming. Mix subjects,
+    test yourself, and keep time for food, sleep and something you enjoy. Talk to a teacher or friend if you feel
+    overwhelmed.
+  emotions: [Stress, Anxiety]
+  topics: [academic]
+  source: NHS, Tips on preparing for exams
+  url: https://www.nhs.uk/mental-health/children-and-young-adults/help-for-teenagers-young-adults-and-students/tips-on-preparing-for-exams/
+
+- id: exams-sleep
+  title: Protect your sleep during exams
+  summary: >-
+    Staying up late to revise usually backfires: tiredness makes it harder to concentrate and remember. Stop studying
+    a while before bed, keep a regular bedtime, and get some daylight and movement during the day.
+  emotions: [Stress, Anxiety]
+  topics: [academic, health]
+  source: NHS, Tips on preparing for exams
+  url: https://www.nhs.uk/mental-health/children-and-young-adults/help-for-teenagers-young-adults-and-students/tips-on-preparing-for-exams/
+
+- id: sleep-routine
+  title: Build a regular wind-down routine
+  summary: >-
+    Go to bed and wake up at about the same times every day. In the hour before bed, dim the lights, put screens away
+    and do something calming like reading or a bath. A regular routine helps your body learn when to sleep.
+  emotions: [Stress, Anxiety, Sadness]
+  topics: [health]
+  source: NHS Every Mind Matters, How to fall asleep faster and sleep better
+  url: https://www.nhs.uk/every-mind-matters/mental-wellbeing-tips/how-to-fall-asleep-faster-and-sleep-better/
+
+- id: sleep-environment
+  title: Make your bedroom easier to sleep in
+  summary: >-
+    Keep the room dark, quiet and cool, and avoid caffeine, heavy meals and alcohol late in the day. If you can't
+    sleep after a while, get up, do something quiet in dim light, and go back when you feel sleepy.
+  emotions: [Stress, Anxiety]
+  topics: [health]
+  source: NHS, Insomnia
+  url: https://www.nhs.uk/conditions/insomnia/
+
+- id: sleep-see-gp
+  title: When poor sleep has gone on for a while
+  summary: >-
+    If you've had trouble sleeping for weeks and it's affecting your day, it's worth speaking to a doctor. Changing
+    sleep habits is usually the first step, and a doctor can look at anything else that might be playing a part.
+  emotions: [Stress, Sadness, Anxiety]
+  topics: [health]
+  source: NHS, Insomnia
+  url: https://www.nhs.uk/conditions/insomnia/
+
+- id: low-mood-activity
+  title: Stay a little bit active when your mood is low
+  summary: >-
+    When you feel low it's tempting to stop doing things, but that can make it harder. Plan small, easy activities,
+    like a short walk, a shower or a call, and do them even if you don't feel like it. Mood often follows action.
+  emotions: [Sadness, Neutral]
+  topics: [self]
+  source: NHS, Low mood, sadness and depression
+  url: https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/low-mood-sadness-depression/
+
+- id: low-mood-help
+  title: When low mood doesn't lift
+  summary: >-
+    Low mood usually passes after a few days or weeks. If it lasts more than two weeks, or you've lost interest in
+    things you used to enjoy, talk to a doctor or counsellor. In India you can also call Tele-MANAS on 14416.
+  emotions: [Sadness]
+  topics: [self, health]
+  source: NHS, Low mood, sadness and depression
+  url: https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/low-mood-sadness-depression/
+
+- id: loneliness-small-steps
+  title: Reconnect with people in small steps
+  summary: >-
+    Message an old friend, join a class or group around something you like, or volunteer. Start small; even short,
+    regular contact helps. Spending less time comparing yourself with others on social media can help too.
+  emotions: [Sadness, Neutral]
+  topics: [social]
+  source: NHS, Feeling lonely
+  url: https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/feeling-lonely/
+
+- id: connect-five-steps
+  title: Make time for the people around you
+  summary: >-
+    Good relationships are one of the strongest supports for wellbeing. Try a meal with family, a call instead of a
+    text, or asking someone how they really are. Connecting with others is the first of the NHS five steps to
+    wellbeing.
+  emotions: [Sadness, Neutral, Joy]
+  topics: [social, family, relationship]
+  source: NHS, 5 steps to mental wellbeing
+  url: https://www.nhs.uk/mental-health/self-help/guides-tools-and-activities/five-steps-to-mental-wellbeing/
+
+- id: learn-five-steps
+  title: Learn something small and new
+  summary: >-
+    Learning a new skill, a recipe, a song, a few words of a language, can boost confidence and give a sense of
+    achievement. It doesn't need to be big; curiosity itself helps.
+  emotions: [Neutral, Sadness, Joy]
+  topics: [self]
+  source: NHS, 5 steps to mental wellbeing
+  url: https://www.nhs.uk/mental-health/self-help/guides-tools-and-activities/five-steps-to-mental-wellbeing/
+
+- id: give-five-steps
+  title: Do something kind for someone
+  summary: >-
+    Small acts of kindness, like thanking someone, helping a friend or volunteering, can create positive feelings and
+    a sense of purpose for both of you.
+  emotions: [Neutral, Joy, Sadness]
+  topics: [social, self]
+  source: NHS, 5 steps to mental wellbeing
+  url: https://www.nhs.uk/mental-health/self-help/guides-tools-and-activities/five-steps-to-mental-wellbeing/
+
+- id: anger-pause
+  title: Pause before you react
+  summary: >-
+    When you notice anger rising, step away for a few minutes, breathe slowly and count to ten. Come back to the
+    situation once you're calmer. Regular exercise and getting enough sleep also make anger easier to manage.
+  emotions: [Anger]
+  topics: [relationship, family, work]
+  source: NHS, Anger
+  url: https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/anger/
+
+- id: anger-express
+  title: Say what's bothering you, calmly
+  summary: >-
+    Once you've cooled down, explain what upset you and what you need, starting with "I feel" rather than blaming.
+    If anger is causing problems in relationships or at work, a counsellor or anger-management course can help.
+  emotions: [Anger]
+  topics: [relationship, family, work, social]
+  source: NHS, Anger
+  url: https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/anger/
+
+- id: grief-support
+  title: Let yourself grieve, and lean on others
+  summary: >-
+    Grief can bring sadness, anger, guilt and exhaustion, and it doesn't follow a timetable. Talk about the person or
+    the loss with people you trust, keep basic routines going, and be patient with yourself.
+  emotions: [Sadness]
+  topics: [family, relationship]
+  source: NHS, Grief after bereavement or loss
+  url: https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/grief-bereavement-loss/
+
+- id: mindfulness-present
+  title: Notice the present moment
+  summary: >-
+    Pick an everyday moment, like drinking tea or walking, and pay full attention to it: the taste, the sounds, how
+    your body feels. When your mind wanders, gently bring it back. A few minutes a day can help you step back from
+    worries.
+  emotions: [Stress, Anxiety, Anger]
+  topics: []
+  source: NHS, Mindfulness
+  url: https://www.nhs.uk/mental-health/self-help/tips-and-support/mindfulness/
+
+- id: self-esteem-kind
+  title: Talk to yourself like you would to a friend
+  summary: >-
+    Notice harsh thoughts about yourself and ask what you'd say to a friend in the same situation. Write down a few
+    things you're good at or proud of, and spend time with people who are supportive.
+  emotions: [Sadness, Anxiety]
+  topics: [self]
+  source: NHS, Raising low self-esteem
+  url: https://www.nhs.uk/mental-health/self-help/tips-and-support/raise-low-self-esteem/
+
+- id: money-worries
+  title: Get support with money worries early
+  summary: >-
+    Money problems and stress often feed each other. List what you owe and what's coming in, deal with priority bills
+    first, and talk to the people you owe or a free debt advice service sooner rather than later.
+  emotions: [Stress, Anxiety, Fear]
+  topics: [money]
+  source: NHS, How to cope with financial worries
+  url: https://www.nhs.uk/mental-health/advice-for-life-situations-and-events/how-to-cope-with-financial-worries/
+
+- id: movement
+  title: Move your body a little every day
+  summary: >-
+    Regular physical activity is linked with lower stress and better mood and sleep. Any movement counts: walking,
+    cycling, dancing or taking the stairs. Adults are advised to aim for about 150 minutes of moderate activity a week.
+  emotions: [Sadness, Stress, Anger, Neutral]
+  topics: [health]
+  source: WHO, Physical activity fact sheet
+  url: https://www.who.int/news-room/fact-sheets/detail/physical-activity
+
+- id: work-boundaries
+  title: Set limits on work where you can
+  summary: >-
+    Long hours, unclear expectations and little control are common sources of work stress. Take regular breaks, set a
+    finishing time, and talk to your manager about workload. Support at work for mental health is your right, not a
+    favour.
+  emotions: [Stress, Anger, Anxiety]
+  topics: [work]
+  source: WHO, Mental health at work
+  url: https://www.who.int/news-room/fact-sheets/detail/mental-health-at-work
+
+- id: gratitude
+  title: Notice what went well
+  summary: >-
+    At the end of the day, write down three things that went well and why. Paying attention to good moments, however
+    small, is one of the simplest habits linked with feeling happier.
+  emotions: [Joy, Neutral, Sadness]
+  topics: []
+  source: NHS, How to be happier
+  url: https://www.nhs.uk/mental-health/self-help/tips-and-support/how-to-be-happier/
+
+- id: caring-basics
+  title: Keep up small daily self-care habits
+  summary: >-
+    Regular exercise, healthy meals, enough water, good sleep, relaxing activities and staying connected all support
+    mental health. If you're struggling for two weeks or more, reach out to a health professional.
+  emotions: [Neutral, Sadness, Stress]
+  topics: [health, self]
+  source: NIMH, Caring for your mental health
+  url: https://www.nimh.nih.gov/health/topics/caring-for-your-mental-health
+
+- id: tele-manas
+  title: Talk to a trained counsellor, free, any time
+  summary: >-
+    Tele-MANAS is India's free government mental-health helpline, available 24x7 in many languages. Call 14416 or
+    1800-891-4416 to talk to a trained counsellor about stress, low mood or anything that feels like too much.
+  emotions: [Sadness, Anxiety, Stress, Fear]
+  topics: [self, health, family, relationship]
+  source: Tele-MANAS, Ministry of Health and Family Welfare, India
+  url: https://telemanas.mohfw.gov.in/
