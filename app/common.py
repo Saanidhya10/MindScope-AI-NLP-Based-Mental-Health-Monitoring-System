@@ -6,6 +6,7 @@ import streamlit as st
 from src import recommend
 from src.database import MoodDatabase
 from src.inference import EmotionPredictor
+from src.triggers import TriggerDetector
 from src.utils import load_config
 from src.voice import VoiceAnalyzer
 
@@ -31,6 +32,11 @@ def get_predictor() -> EmotionPredictor:
 @st.cache_resource(show_spinner="Loading the speech models (first time only, this takes a minute)…")
 def get_voice() -> VoiceAnalyzer:
     return VoiceAnalyzer(get_cfg())
+
+
+@st.cache_resource(show_spinner="Loading the topic model (first time only, this takes a minute)…")
+def get_triggers() -> TriggerDetector:
+    return TriggerDetector(get_cfg())
 
 
 def user_id() -> str:

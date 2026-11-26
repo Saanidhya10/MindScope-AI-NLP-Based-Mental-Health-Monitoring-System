@@ -30,8 +30,11 @@ ui.section("Sample data", "Runs an invented three-week journal through the real 
                           "check-ins, so you can see how MindScope looks with some history. Only available on an empty profile.")
 if st.button("Add sample entries", disabled=not (consent and hist.empty)):
     entries = sample_entries()
-    for (ts, _), p in zip(entries, common.get_predictor().predict_proba([t for _, t in entries])):
-        db.add_prediction(uid, p, ts)
+    texts = [t for _, t in entries]
+    with st.spinner("Analysing the sample journal…"):
+        found = common.get_triggers().detect(texts)
+        for (ts, _), p, trig in zip(entries, common.get_predictor().predict_proba(texts), found):
+            db.add_prediction(uid, p, ts, triggers=[k for k, _ in trig])
     days = sorted({ts.date() for ts, _ in entries})
     span = pd.date_range(days[0], days[-1])  # one invented check-in per day across the same three weeks
     for day, row in lifestyle.sample_checkins(list(span)).iterrows():

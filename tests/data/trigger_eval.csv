@@ -1,0 +1,49 @@
+text,labels
+"My exams are approaching, my parents expect good marks, and I cannot sleep properly.",academic|family|health
+"I failed the chemistry test and I'm scared to tell anyone.",academic
+"Three assignments are due on Friday and I haven't started any of them.",academic
+"The professor embarrassed me in front of the whole class today.",academic
+"I've been revising for hours but nothing is going in.",academic
+"Got my semester results and they were better than expected!",academic
+"My boss keeps piling on work and I might lose my job.",work
+"The interview went badly, I froze on every question.",work
+"I got the internship offer! I'm thrilled.",work
+"My manager criticised my report in front of the team.",work
+"Another twelve-hour shift, my feet are killing me.",work|health
+"Everyone at the office seems to get promoted except me.",work|self
+"Rent is due and I don't know how I'll pay it.",money
+"My credit card debt keeps growing every month.",money
+"I can't afford the course fees this semester.",money|academic
+"I finally paid off my loan, such a relief.",money
+"Spent too much again this month and my savings are almost gone.",money
+"I feel so alone, I haven't talked to anyone in days.",social
+"My friends made plans without me again.",social
+"Nobody texted me on my birthday.",social
+"Had a great evening with my friends, laughed so much.",social
+"I moved to a new city and don't know anyone here.",social
+"We had a huge fight and I think she wants to break up.",relationship
+"My boyfriend hasn't replied in two days and I'm overthinking it.",relationship
+"Seeing my ex with someone new really hurt.",relationship
+"Our anniversary dinner was lovely.",relationship
+"My partner and I keep arguing about small things.",relationship
+"My parents keep comparing me to my cousin.",family
+"Had a lovely lunch with my sister today.",family
+"Mom is in hospital and I'm so worried about her.",family|health
+"There's constant shouting at home and I can't focus.",family|academic
+"My dad lost his job and everyone at home is tense.",family|work
+"I barely slept again and I'm exhausted.",health
+"My migraines are back and I can't concentrate.",health
+"I've had a cold all week and feel drained.",health
+"Lying awake at 3am with my mind racing.",health
+"I feel like a failure and have no idea what I'm doing with my life.",self
+"I'm worried I'll never be good enough.",self
+"I don't know what I want to do after graduation.",self|academic
+"I keep hating how I look in photos.",self
+"Finally feeling confident about who I am.",self
+"The new app update didn't work and I lost my notes.",
+"It was a sunny day and I went for a walk by the lake.",
+"Please pay attention to the road when you drive.",
+"Watched a movie, it was okay.",
+"Cooked pasta for dinner, it turned out well.",
+"Traffic was terrible this morning.",
+"The cricket match was so exciting last night!",

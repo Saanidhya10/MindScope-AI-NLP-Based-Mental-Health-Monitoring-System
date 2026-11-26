@@ -118,6 +118,8 @@ _CSS = """
 .stApp .mj-table { border-collapse: collapse; width: 100%; max-width: 760px; background: var(--surface); font-size: 0.95rem; }
 .stApp .mj-table th { text-align: left; font-weight: 600; padding: 0.55rem 0.8rem; border-bottom: 2px solid var(--rule); }
 .stApp .mj-table td { padding: 0.5rem 0.8rem; border-bottom: 1px solid #E2E8E7; }
+.stApp .mj-chip { display: inline-block; background: #E2ECEE; color: var(--ink); border-radius: 999px;
+  padding: 0.1rem 0.65rem; margin: 0 0.3rem 0.3rem 0; font-size: 0.88rem; }
 .stApp .mj-footer { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin-top: 3.5rem; padding-top: 1rem;
   border-top: 1px solid var(--rule); max-width: 80ch; }
 
@@ -212,8 +214,19 @@ def _voice_block(voice: dict) -> str:
                    f'<span class="mj-num">({parts})</span>. {effect}</p>')
 
 
+def _trigger_line(triggers: list[str] | None) -> str:
+    if triggers is None:
+        return ""
+    from src.triggers import BY_KEY
+
+    if not triggers:
+        return '<p class="mj-tone">No particular topic stood out in this entry.</p>'
+    chips = "".join(f'<span class="mj-chip">{escape(BY_KEY[k].label)}</span>' for k in triggers)
+    return f'<p class="mj-tone">It seems to be about {chips}</p>'
+
+
 def entry_result(probs: np.ndarray, crisis: bool, helplines: list[dict], model_label: str,
-                 voice: dict | None = None) -> None:
+                 voice: dict | None = None, triggers: list[str] | None = None) -> None:
     if crisis:
         lines = "".join(f'<li><strong>{escape(h["name"])}</strong> <span class="mj-num">{escape(h["number"])}</span>'
                         f'<span>{escape(h.get("note", ""))}</span></li>' for h in helplines)
@@ -235,6 +248,7 @@ def entry_result(probs: np.ndarray, crisis: bool, helplines: list[dict], model_l
             "tone") is not None else "")
     _md(f'<p class="mj-reading">{headline}</p><p class="mj-certainty">{note}</p>'
         + (_voice_block(voice) if voice is not None else "")
+        + _trigger_line(triggers)
         + f'<div class="mj-bars" role="list" aria-label="Emotion scores">{rows}</div>'
         f'<p class="mj-model">{model_note}.</p>')
 
@@ -421,6 +435,34 @@ def activity_stats(stats: pd.DataFrame) -> None:
         for k, r in stats.sort_values("done", ascending=False).iterrows())
     _md('<table class="mj-table"><thead><tr><th>Activity</th><th>Times done</th><th>Helped</th>'
         f'<th>Average mood change</th></tr></thead><tbody>{rows}</tbody></table>')
+
+
+def trigger_chart(summ: pd.DataFrame) -> None:
+    """Horizontal bars: entries per topic, split into difficult and other entries."""
+    summ = summ.iloc[::-1]
+    fig = go.Figure()
+    fig.add_trace(go.Bar(y=summ["label"], x=summ["difficult"], orientation="h", name="Difficult entries",
+                         marker_color=LEVEL_COLORS["support"], hovertemplate="%{y}: %{x} difficult<extra></extra>"))
+    fig.add_trace(go.Bar(y=summ["label"], x=summ["entries"] - summ["difficult"], orientation="h", name="Other entries",
+                         marker_color="#B9CBCE", hovertemplate="%{y}: %{x} other<extra></extra>"))
+    fig.update_layout(barmode="stack")
+    fig.update_xaxes(gridcolor="#DDE4E2", tickfont=dict(color=MUTED), title=None, dtick=1 if summ["entries"].max() <= 12 else None)
+    fig.update_yaxes(tickfont=dict(color=INK))
+    fig = _layout(fig, 70 + 38 * len(summ))
+    fig.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.15, x=0, font=dict(color=MUTED)))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def trigger_table(entries: pd.DataFrame) -> None:
+    from src.triggers import BY_KEY
+
+    rows = "".join(
+        f"<tr><td class='mj-num'>{r.timestamp:%d %b}</td><td>{escape(r.emotion)}</td><td>"
+        + ("".join(f'<span class="mj-chip">{escape(BY_KEY[k].label)}</span>' for k in r.triggers if k in BY_KEY)
+           or '<span style="color: var(--muted)">None</span>') + "</td></tr>"
+        for r in entries.itertuples())
+    _md('<table class="mj-table"><thead><tr><th>Day</th><th>Main feeling</th><th>Topics</th></tr></thead>'
+        f"<tbody>{rows}</tbody></table>")
 
 
 def footer(model_label: str) -> None:

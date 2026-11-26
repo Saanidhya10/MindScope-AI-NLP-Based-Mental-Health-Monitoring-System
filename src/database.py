@@ -106,19 +106,29 @@ class MoodDatabase:
 
     # ---- write -------------------------------------------------------------------
     def add_prediction(self, user_id: str, probs, timestamp=None, text: str | None = None,
-                       store_text: bool = False) -> None:
-        """Store one prediction. Raises PermissionError without consent. Raw text only if store_text=True."""
+                       store_text: bool = False, triggers: list[str] | None = None) -> None:
+        """Store one prediction. Raises PermissionError without consent. Raw text only if store_text=True.
+        `triggers` are category keys from src.triggers (topics, not text)."""
         if not self.has_consent(user_id):
             raise PermissionError(f"User '{user_id}' has not granted consent; nothing was stored.")
         probs = np.asarray(probs, dtype=float).ravel()
         ts = pd.Timestamp(timestamp or datetime.now()).isoformat(timespec="seconds")
         with self._conn() as c:
             c.execute(
-                "INSERT INTO predictions (user_id, timestamp, emotion, confidence, negative_score, probs, text) "
-                "VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO predictions (user_id, timestamp, emotion, confidence, negative_score, probs, text, "
+                "triggers) VALUES (?,?,?,?,?,?,?,?)",
                 (user_id, ts, ID2LABEL[int(probs.argmax())], float(probs.max()),
                  float(negative_scores(probs[None, :])[0]), json.dumps(probs.tolist()),
-                 text if (store_text and text) else None))
+                 text if (store_text and text) else None, None if triggers is None else json.dumps(triggers)))
+
+    def get_triggers(self, user_id: str) -> pd.DataFrame:
+        """One row per entry that has trigger information: timestamp, emotion, negative_score, triggers (list)."""
+        with self._conn() as c:
+            df = pd.read_sql("SELECT timestamp, emotion, negative_score, triggers FROM predictions "
+                             "WHERE user_id=? AND triggers IS NOT NULL ORDER BY timestamp", c, params=(user_id,))
+        df["timestamp"] = pd.to_datetime(df["timestamp"], format="ISO8601")
+        df["triggers"] = df["triggers"].map(json.loads)
+        return df
 
     # ---- read --------------------------------------------------------------------
     def get_predictions(self, user_id: str, since=None) -> pd.DataFrame:

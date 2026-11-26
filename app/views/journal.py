@@ -17,11 +17,12 @@ def save_entry(text: str, voice_info: dict | None = None, tone=None) -> None:
     used = False
     if tone is not None:
         probs, used = fuse(probs, tone, cfg["voice"]["tone_weight"])
-    db.add_prediction(uid, probs)
+    found = [k for k, _ in common.get_triggers().detect([text])[0]]
+    db.add_prediction(uid, probs, triggers=found)
     if voice_info is not None:
         voice_info.update(tone=tone, tone_used=used)
     st.session_state["last"] = {"probs": probs, "crisis": recommend.check_crisis(text, cfg), "voice": voice_info,
-                                "text": text}
+                                "triggers": found}
     st.toast("Entry analysed and saved")
     st.rerun()
 
@@ -75,7 +76,8 @@ with right:
     ui.section("What came through")
     if "last" in st.session_state:
         last = st.session_state["last"]
-        ui.entry_result(last["probs"], last["crisis"], common.helplines(), common.get_predictor().label, last["voice"])
+        ui.entry_result(last["probs"], last["crisis"], common.helplines(), common.get_predictor().label, last["voice"],
+                        last.get("triggers"))
     else:
         ui.entry_placeholder()
 

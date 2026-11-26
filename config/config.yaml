@@ -378,6 +378,14 @@ app:
   max_input_chars: 1000
 
 # -----------------------------------------------------------------------------
+# Trigger analysis (src/triggers.py): what an entry seems to be about. Evaluate: scripts/eval_triggers.py
+# -----------------------------------------------------------------------------
+triggers:
+  model: MoritzLaurer/deberta-v3-base-zeroshot-v2.0   # multi-label zero-shot NLI (~0.7 GB, first use)
+  threshold: 0.60                      # report a category when its score is at least this
+  keyword_score: 0.65                  # score given to an explicit keyword mention
+
+# -----------------------------------------------------------------------------
 # Voice entries (src/voice.py), English only. Recordings are processed in memory and never saved.
 # -----------------------------------------------------------------------------
 voice:
