@@ -77,9 +77,57 @@ HINGLISH_MAP = {
 }
 
 
+HINGLISH_MAP.update({
+    "dukhi": "sad", "rona": "crying", "roya": "cried", "royi": "cried", "akeli": "lonely", "akelapan": "loneliness",
+    "pareshaan": "worried", "pareshan": "worried", "tension": "stress anxiety", "stress": "stress", "chinta": "worry",
+    "dar": "scared", "darr": "scared", "dara": "scared", "dari": "scared", "ghabrahat": "panic anxiety",
+    "gussa": "angry", "gusse": "angry", "naraz": "upset angry", "chidchida": "irritable", "khush": "happy",
+    "khushi": "happiness", "mast": "great happy", "badhiya": "great", "accha": "good", "achha": "good",
+    "acha": "good", "bura": "bad", "bekar": "useless awful", "bekaar": "useless awful", "thaka": "tired",
+    "thaki": "tired", "thakan": "exhaustion", "thakaan": "exhaustion", "neend": "sleep", "bimar": "sick",
+    "beemar": "sick", "dard": "pain", "pyaar": "love", "shukriya": "grateful", "udaas": "sad", "udas": "sad",
+})
+# Rough English glosses for common Hinglish function words, so the English model sees closer-to-English input.
+# Applied only when the text looks like Hinglish (some, like "main" and "par", are also English words).
+HINGLISH_GLOSS = ({
+    "yaar": "", "bahut": "very", "bohot": "very", "hai": "is", "hain": "are", "hoon": "am", "hun": "am",
+    "tha": "was", "thi": "was", "mujhe": "I", "mujhko": "I", "main": "I", "mera": "my", "meri": "my", "mere": "my",
+    "nahi": "not", "nahin": "not", "nhi": "not", "aaj": "today", "kuch": "something", "sab": "everything",
+    "lekin": "but", "par": "but", "aur": "and", "bhi": "also", "kyun": "why", "kyunki": "because", "abhi": "now",
+    "raha": "", "rahi": "", "rahe": "", "gaya": "", "gayi": "", "ho": "", "ki": "", "ke": "", "ka": "", "ko": "",
+    "mein": "in", "se": "from", "wajah": "because", "matlab": "meaning", "zyada": "too much", "kam": "less",
+})
+_HINGLISH_MARKERS = {"hai", "hain", "nahi", "nahin", "bahut", "yaar", "mujhe", "mera", "meri", "kya", "aaj", "raha",
+                     "rahi", "hoon", "kuch", "kyun", "abhi", "bhi", "aur", "lekin", "wajah", "ki", "ko", "se", "gaya"}
+# Multi-word Hinglish phrases, replaced before single words (order matters: negations first).
+HINGLISH_PHRASES = [
+    (r"khush nahi(?:n)?", "not happy"), (r"(?:a(?:c)?cha|achha) nahi(?:n)? lag(?: raha| rahi| rha| rhi)?", "I don't feel good"),
+    (r"neend nahi(?:n)? aa(?: rahi| raha| rhi)?|so nahi(?:n)? pa(?: raha| rahi| rha| rhi)", "I can't sleep"),
+    (r"mood off", "I feel low"), (r"dimag kharab", "I'm very irritated"),
+    (r"rona aa(?: raha| rahi| rha| rhi)?", "I feel like crying"), (r"dil toot(?: gaya| gya)?", "I'm heartbroken"),
+    (r"bore ho(?: raha| rahi| rha| rhi)?", "I'm bored"), (r"thak gay(?:a|i)|thak gai", "I'm exhausted"),
+    (r"darr? lag(?: raha| rahi| rha| rhi)?", "I'm scared"), (r"bura lag(?: raha| rahi| rha| rhi)?", "I feel bad"),
+    (r"maza aaya|maza aa gaya|mazaa aaya", "I had fun"), (r"sukoon mila", "I felt relieved"),
+    (r"ghabrahat ho(?: rahi| raha| rhi)?", "I feel anxious"), (r"tension ho(?: rahi| raha| rhi)?", "I feel stressed"),
+    (r"akela(?:pan)? feel", "lonely"), (r"ki wajah se|ke wajah se|ki vajah se", "because of"), (r"kuch samajh nahi(?:n)? aa(?: raha| rahi| rha| rhi)?", "I feel confused and lost"),
+]
+_PHRASE_RE = [(re.compile(rf"\b(?:{p})\b", re.I), r) for p, r in HINGLISH_PHRASES]
+
+
 def normalize_hinglish(text: str) -> str:
-    """Replace Hindi/Hinglish feeling words with English proxies (other words are left untouched)."""
-    return " ".join(HINGLISH_MAP.get(w.lower().strip(".,!?:;\"'()[]"), w) for w in text.split())
+    """Replace Hindi/Hinglish feeling phrases and words with English proxies (other words are left untouched)."""
+    if not HINGLISH_ENABLED:
+        return text
+    for rx, rep in _PHRASE_RE:
+        text = rx.sub(rep, text)
+    toks = text.split()
+    keys = [w.lower().strip(".,!?:;\"'()[]") for w in toks]
+    gloss = HINGLISH_GLOSS if sum(k in _HINGLISH_MARKERS for k in keys) >= 2 else {}
+    words = (HINGLISH_MAP.get(k, gloss.get(k, w)) for w, k in zip(toks, keys))
+    return " ".join(w for w in words if w)
+
+
+HINGLISH_ENABLED = True  # switched off only to measure the English-only baseline (scripts/eval_multilingual.py)
 
 
 def clean_basic(text: str) -> str:

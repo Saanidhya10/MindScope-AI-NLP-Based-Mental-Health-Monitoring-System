@@ -239,7 +239,8 @@ def _trigger_line(triggers: list[str] | None) -> str:
 
 
 def entry_result(probs: np.ndarray, crisis: bool, helplines: list[dict], model_label: str,
-                 voice: dict | None = None, triggers: list[str] | None = None) -> None:
+                 voice: dict | None = None, triggers: list[str] | None = None,
+                 notes: list[str] | None = None) -> None:
     if crisis:
         lines = "".join(f'<li><strong>{escape(h["name"])}</strong> <span class="mj-num">{escape(h["number"])}</span>'
                         f'<span>{escape(h.get("note", ""))}</span></li>' for h in helplines)
@@ -262,6 +263,7 @@ def entry_result(probs: np.ndarray, crisis: bool, helplines: list[dict], model_l
     _md(f'<p class="mj-reading">{headline}</p><p class="mj-certainty">{note}</p>'
         + (_voice_block(voice) if voice is not None else "")
         + _trigger_line(triggers)
+        + "".join(f'<p class="mj-tone mj-sub">{escape(n)}</p>' for n in (notes or []))
         + f'<div class="mj-bars" role="list" aria-label="Emotion scores">{rows}</div>'
         f'<p class="mj-model">{model_note}.</p>')
 

@@ -334,6 +334,17 @@ recommend:
     - mar jaana
     - marne ka man
     - jaan dena
+    - marna chahta
+    - marna chahti
+    - jeena nahi chahta
+    - jeena nahi chahti
+    - khud ko khatam
+    - आत्महत्या
+    - मरना चाहता
+    - मरना चाहती
+    - जीना नहीं चाहता
+    - जीना नहीं चाहती
+    - खुद को नुकसान
 
 # -----------------------------------------------------------------------------
 # Storage + privacy
@@ -394,6 +405,14 @@ knowledge:
   emotion_boost: 0.10                  # added when an entry is tagged for the entry's main feeling (half for the 2nd)
   topic_boost: 0.12                    # added per matching topic (up to two)
   per_entry: 3                         # suggestions shown under a journal entry
+
+# -----------------------------------------------------------------------------
+# Multilingual and context-aware reading (src/multilingual.py). Evaluate: scripts/eval_multilingual.py
+# -----------------------------------------------------------------------------
+multilingual:
+  translation_model: Helsinki-NLP/opus-mt-hi-en   # Hindi (Devanagari) -> English, ~300 MB, local
+  present_weight: 0.8                  # "used to... but now..." -> weight of the present part
+  other_person_weight: 0.5             # entry only about someone else's feelings -> scaled towards Neutral
 
 # -----------------------------------------------------------------------------
 # Trigger analysis (src/triggers.py): what an entry seems to be about. Evaluate: scripts/eval_triggers.py

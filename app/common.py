@@ -8,6 +8,7 @@ from src.database import MoodDatabase
 from src.inference import EmotionPredictor
 from src.forecast import Forecaster
 from src.knowledge import KnowledgeBase
+from src.multilingual import Translator
 from src.triggers import TriggerDetector
 from src.utils import resolve_path
 from src.utils import load_config
@@ -50,6 +51,11 @@ def get_forecaster() -> Forecaster:
 @st.cache_resource(show_spinner="Loading the wellness library…")
 def get_knowledge() -> KnowledgeBase:
     return KnowledgeBase(get_cfg())
+
+
+@st.cache_resource(show_spinner="Loading the Hindi translation model (first time only)…")
+def get_translator() -> Translator:
+    return Translator(get_cfg()["multilingual"]["translation_model"])
 
 
 def user_id() -> str:

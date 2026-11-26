@@ -100,6 +100,33 @@ trained model; the report still needs the fine-tuned DistilBERT (see "Next steps
 - Not yet verified end to end with a real microphone in the browser; the model calls were smoke-tested on
   synthetic speech (transcription exact; the tone model rated the synthetic voice "happy", as expected for TTS).
 
+## 8. MindScope AI (branch `mindscope-ai`)
+
+Renamed the app to **MindScope AI: An Intelligent Personal Emotional Wellness and Monitoring Platform** and split it into
+pages (`app/views/`, shared state in `app/common.py`). Implemented improvements 1, 2, 3 (retrieval only), 4, 8, 9 and 10
+from the improvement roadmap; 5 (AI assistant) is waiting on the choice of language model.
+
+| # | Feature | Where | Evidence |
+|---|---|---|---|
+| 8 | Daily check-in + lifestyle associations | `src/lifestyle.py`, Daily check-in page | Spearman, min 10 days, same day + next day |
+| 9 | Wellness activities, adaptive suggestions | `src/activities.py`, Wellness activities page | Thompson sampling over "did it help?" |
+| 4 | Trigger analysis | `src/triggers.py`, Triggers page | `scripts/eval_triggers.py`: micro-F1 0.93 hybrid / 0.82 model / 0.88 keywords (48 sentences; keywords tuned on this set) |
+| 2 | Emotional profile | `src/fingerprint.py`, Emotional profile page | Isolation Forest unusual days, recovery time |
+| 1 | Outlook (experimental) | `src/forecast.py`, Outlook page | `scripts/eval_forecast.py`: GBM MAE 0.096-0.156 vs persistence 0.101-0.181 on simulated timelines |
+| 3 | Evidence-based suggestions | `src/knowledge.py`, `data/knowledge/wellness_kb.yaml`, Knowledge centre | 32 entries, 23 source pages checked 2026-11-26 |
+| 10 | Hindi + Hinglish + context rules | `src/multilingual.py`, `src/preprocess.py` | `scripts/eval_multilingual.py`: 84% vs 13% main-feeling accuracy (45 sentences) |
+
+- Database: new tables `checkins`, `activity_log`, `goals`, `notes`, `forecasts`, and a `triggers` column on entries
+  (added automatically to existing databases). Delete-my-data clears all of them. Journal text is still never stored;
+  gratitude/thought notes are saved only with a separate opt-in.
+- New models, all local and downloaded on first use: zero-shot topic model (~0.7 GB), sentence embeddings (~90 MB),
+  Hindi translation (~0.3 GB). The outlook model is trained on first use (~15 s) and cached.
+- Limits: the outlook is evaluated only on simulated data; triggers and Hinglish scores come from small hand-labelled
+  sets written for this project; translation can soften feelings ("मम्मी पापा बहुत उम्मीद करते हैं" became "Mom hopes so
+  much"); the default emotion model still never predicts Stress; voice stays English only.
+- Tests: 96 passing (new: `test_lifestyle`, `test_activities`, `test_triggers`, `test_fingerprint`, `test_forecast`,
+  `test_knowledge`, `test_multilingual`).
+
 ## How to run
 
 ```bash

@@ -4,32 +4,36 @@ import streamlit as st
 
 import common
 import ui
-from src import recommend
+from src import multilingual, recommend
 from src.utils import LABELS
 from src.voice import fuse, load_audio
 
 cfg, db, uid = common.get_cfg(), common.get_db(), common.user_id()
-ui.page_header("Journal", "Write or say a few lines about your day. The app picks out the feelings in it.")
+ui.page_header("Journal", "Write or say a few lines about your day. The app picks out the feelings in it. You can "
+                          "write in English, Hindi or Hinglish; recordings are English only.")
 ui.help_line(common.helplines())
 
 
 def save_entry(text: str, voice_info: dict | None = None, tone=None) -> None:
-    """Score the text (and tone, if given), store only the scores, remember the result for the right column."""
-    probs = common.get_predictor().predict_proba(text)[0]
+    """Read the text (translating Hindi, applying context rules), add tone if given, store only the scores, and
+    remember the result for the right column."""
+    translator = common.get_translator() if multilingual.detect_language(text) == "hi" else None
+    reading = multilingual.read(text, common.get_predictor().predict_proba, translator, cfg)
+    probs, english = reading.probs, reading.model_text
     used = False
     if tone is not None:
         probs, used = fuse(probs, tone, cfg["voice"]["tone_weight"])
-    found = [k for k, _ in common.get_triggers().detect([text])[0]]
+    found = [k for k, _ in common.get_triggers().detect([english])[0]]
     db.add_prediction(uid, probs, triggers=found)
     if voice_info is not None:
         voice_info.update(tone=tone, tone_used=used)
-    crisis = recommend.check_crisis(text, cfg)
+    crisis = recommend.check_crisis(text, cfg) or recommend.check_crisis(english, cfg)
     recs = []
     if not crisis:  # crisis messages get helplines only, never generic tips
         top = [LABELS[i] for i in np.argsort(probs)[::-1][:2]]
-        recs = common.get_knowledge().recommend(text, top, found, k=cfg["knowledge"]["per_entry"])
+        recs = common.get_knowledge().recommend(english, top, found, k=cfg["knowledge"]["per_entry"])
     st.session_state["last"] = {"probs": probs, "crisis": crisis, "voice": voice_info, "triggers": found,
-                                "recs": recs}
+                                "recs": recs, "notes": reading.notes}
     st.toast("Entry analysed and saved")
     st.rerun()
 
@@ -46,7 +50,7 @@ with left:
                 text = st.text_area("What happened today, and how did it feel?", height=170,
                                     max_chars=cfg["app"]["max_input_chars"],
                                     placeholder="Work felt overwhelming and I'm nervous about tomorrow's presentation, "
-                                                "but finishing the slides was a relief.")
+                                                "but finishing the slides was a relief. (Hindi or Hinglish is fine too.)")
                 submitted = st.form_submit_button("Analyse entry", type="primary", disabled=not consent)
             if submitted:
                 if len(text.split()) < 3:
@@ -84,7 +88,7 @@ with right:
     if "last" in st.session_state:
         last = st.session_state["last"]
         ui.entry_result(last["probs"], last["crisis"], common.helplines(), common.get_predictor().label, last["voice"],
-                        last.get("triggers"))
+                        last.get("triggers"), last.get("notes"))
         if last.get("recs"):
             ui.section("Suggestions for this entry", "From MindScope's wellness library. Each one links to the public "
                                                      "guidance it's based on.")

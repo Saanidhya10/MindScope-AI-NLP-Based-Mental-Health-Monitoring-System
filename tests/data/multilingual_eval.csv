@@ -1,0 +1,46 @@
+text,language,emotion,valence
+"मुझे अपनी परीक्षा की चिंता हो रही है।",hi,Anxiety,negative
+"आज मैं बहुत उदास हूँ, कुछ अच्छा नहीं लग रहा।",hi,Sadness,negative
+"मुझे बहुत गुस्सा आ रहा है।",hi,Anger,negative
+"मैं आज बहुत खुश हूँ!",hi,Joy,positive
+"मुझे बहुत डर लग रहा है।",hi,Fear,negative
+"मैं अकेला महसूस कर रहा हूँ।",hi,Sadness,negative
+"आज का दिन बहुत अच्छा था, दोस्तों के साथ मज़ा आया।",hi,Joy,positive
+"मेरा भाई मुझसे बात नहीं करता, मुझे बुरा लगता है।",hi,Sadness,negative
+"कल मेरा इंटरव्यू है और मैं बहुत घबराया हुआ हूँ।",hi,Anxiety,negative
+"मुझे नौकरी मिल गई, मैं बहुत उत्साहित हूँ।",hi,Joy,positive
+"आज कुछ खास नहीं हुआ, सामान्य दिन था।",hi,Neutral,neutral
+"उसने मेरे साथ धोखा किया, मैं बहुत नाराज़ हूँ।",hi,Anger,negative
+"परिवार की उम्मीदों से मैं दबाव में हूँ।",hi,Anxiety,negative
+"मैं अपने नतीजों से बहुत निराश हूँ।",hi,Sadness,negative
+"Yaar exams ki wajah se bahut tension hai",hinglish,Anxiety,negative
+"Mujhe aaj bahut gussa aa raha hai",hinglish,Anger,negative
+"Main bahut khush hoon aaj",hinglish,Joy,positive
+"Kal se neend nahi aa rahi aur thak gaya hoon",hinglish,Sadness,negative
+"Aaj khush nahi hoon yaar",hinglish,Sadness,negative
+"Mood off hai, kuch accha nahi lag raha",hinglish,Sadness,negative
+"Interview ke baare mein soch ke ghabrahat ho rahi hai",hinglish,Anxiety,negative
+"Dosto ke saath bahut maza aaya aaj",hinglish,Joy,positive
+"Bahut akela feel ho raha hai",hinglish,Sadness,negative
+"Boss ne sabke saamne daanta, dimag kharab ho gaya",hinglish,Anger,negative
+"Results aa gaye, mast number aaye!",hinglish,Joy,positive
+"Raat ko darr lag raha tha akele ghar mein",hinglish,Fear,negative
+"Kuch samajh nahi aa raha life mein kya karun",hinglish,Sadness,negative
+"Aaj normal din tha, kuch khaas nahi",hinglish,Neutral,neutral
+"Uska message nahi aaya, bura lag raha hai",hinglish,Sadness,negative
+"Exam khatam ho gaye, finally sukoon mila",hinglish,Joy,positive
+"Rona aa raha hai yaar, sab galat ho raha hai",hinglish,Sadness,negative
+"Mummy papa ki expectations se bahut pressure hai",hinglish,Anxiety,negative
+"Dil toot gaya yaar",hinglish,Sadness,negative
+"Office mein aaj bahut bore ho raha tha",hinglish,Neutral,neutral
+"I used to be anxious about exams but now I feel fine.",en,Joy,positive
+"I was really sad last month, but now things are getting better.",en,Joy,positive
+"My friend is really sad about her breakup.",en,Neutral,neutral
+"She was angry at her brother all day.",en,Neutral,neutral
+"I am not sad anymore.",en,Neutral,neutral
+"I'm no longer stressed, things are calmer.",en,Joy,positive
+"I am not happy at all.",en,Sadness,negative
+"My friend is sad and I feel worried about her.",en,Anxiety,negative
+"I was angry earlier but now I just feel tired.",en,Sadness,negative
+"They seem happy together and I'm glad for them.",en,Joy,positive
+"I don't feel anxious today for once.",en,Neutral,neutral

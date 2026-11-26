@@ -233,7 +233,27 @@ A multi-page **Streamlit** app (`streamlit run app/app.py` from the repo root). 
 - **How you've been**: a single status (steady / watch / support) from the smoothed negative-affect trend and the
   user's personal baseline, with one suggestion. Sustained distress adds the helplines from `config.yaml`.
 - **Emotion mix** (donut, last 30 days) and **difficult feelings over time** (by day, week or month).
-- **Voice entries** (English only): choose *Record* instead of *Write*. Whisper (`small.en`, local) transcribes the
+- **Pages**: Home, Journal, Daily check-in, Wellness activities, Emotional profile, Outlook, Triggers, Knowledge
+  centre, Settings & privacy (`app/views/`).
+- **Daily check-in** (`src/lifestyle.py`): sleep, activity, screen time, social contact, workload, mood, energy and
+  stress, with Spearman associations (same day and next day) shown after 10 check-ins, worded as associations.
+- **Wellness activities** (`src/activities.py`): breathing, grounding, gratitude and thought journals, study planner,
+  sleep routine, body scan, goals; before/after mood and "did it help?" feed Thompson-sampling suggestions.
+- **Trigger analysis** (`src/triggers.py`): zero-shot (deberta-v3) + keyword topic tagging. Hand-labelled set of 48
+  sentences (`scripts/eval_triggers.py`): micro-F1 0.93 hybrid vs 0.82 model-only (keywords were refined on this set,
+  so the hybrid number is optimistic).
+- **Emotional profile** (`src/fingerprint.py`): usual vs last 7 days per dimension, recovery time, personal alert
+  line, Isolation Forest unusual days with plain-language reasons.
+- **Outlook** (`src/forecast.py`, experimental): 3- and 7-day forecasts of the daily difficult-feelings share with
+  80% ranges. Trained and backtested on simulated timelines (`scripts/eval_forecast.py`): gradient boosting MAE 0.096
+  (1 day) to 0.156 (7 days) vs 0.101 to 0.181 for persistence. Saved outlooks are compared with what happened.
+- **Evidence-based suggestions** (`src/knowledge.py`): 32-entry curated library (`data/knowledge/wellness_kb.yaml`),
+  each linked to an NHS / WHO / NIMH / Tele-MANAS page, retrieved with sentence embeddings + feeling/topic boosts +
+  MMR diversity. Retrieval only, no generated text; crisis messages show helplines instead.
+- **Hindi and Hinglish** (`src/multilingual.py`): Hindi translated locally (opus-mt-hi-en), Hinglish phrase/word lists,
+  past-vs-now and someone-else's-feelings rules. Hand-labelled set of 45 (`scripts/eval_multilingual.py`): main-feeling
+  accuracy 84% vs 13% English-only (labels written for this project; have a second person check them).
+ choose *Record* instead of *Write*. Whisper (`small.en`, local) transcribes the
   recording and the transcript goes through the same emotion model and crisis check. With the tone option on, a
   speech-emotion model (`superb/wav2vec2-base-superb-er`, 4 classes) scores the tone of voice and is blended in at
   weight 0.25, one-directionally: tone can add evidence of difficult feelings but never lowers what the words say.

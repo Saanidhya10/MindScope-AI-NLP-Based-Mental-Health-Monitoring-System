@@ -37,6 +37,10 @@ evaluate>=0.4
 sentencepiece>=0.1.99       # needed by MarianMT tokenizers
 sacremoses>=0.0.53          # needed by MarianMT tokenizers
 
+# --- MindScope AI features ----------------------------------------------------
+sentence-transformers>=3.0  # knowledge-library retrieval (all-MiniLM-L6-v2, local)
+# Trigger analysis (deberta-v3 zero-shot) and Hindi translation (opus-mt-hi-en) use transformers + sentencepiece/sacremoses
+
 # --- Voice entries (src/voice.py, English only) ------------------------------
 faster-whisper>=1.0         # speech -> text (Whisper, runs locally on CPU)
 soundfile>=0.12             # read recorded audio
