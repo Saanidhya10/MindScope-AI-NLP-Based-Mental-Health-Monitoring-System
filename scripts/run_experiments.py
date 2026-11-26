@@ -151,7 +151,8 @@ def cmd_trend(args, cfg) -> int:
     k = int(cget(cfg, "trends.k_days", 3))
     final = args.final_model or f"{best_model_from_comparison(res, 'lr')}:none"
     pool = load_pool(res, final)
-    scenarios = {n: s for n, s in trends.SCENARIOS.items() if not args.scenarios or n in args.scenarios}
+    scen_items = trends.SCENARIOS.items() if hasattr(trends.SCENARIOS, "items") else [(s, {"name": s}) for s in trends.SCENARIOS]
+    scenarios = {n: s for n, s in scen_items if not args.scenarios or n in args.scenarios}
     seed0 = int(cget(cfg, "seed", 42))
     pcols = [f"p_{c}" for c in classes]
 
@@ -160,15 +161,22 @@ def cmd_trend(args, cfg) -> int:
         for u in range(args.users):
             tl = trends.simulate_timeline(pool, scen, start="2025-01-01", seed=seed0 + u,
                                           user_id=f"{name}-{u}", classes=classes)
-            tl = tl.merge(pool[["id", "y_pred"] + pcols], on="id", how="left")
+            if "id" in tl.columns and "id" in pool.columns:
+                merge_cols = [c for c in ["y_pred"] + pcols if c in pool.columns]
+                tl = tl.merge(pool[["id"] + merge_cols], on="id", how="left")
             q = trends.trend_quality(tl, classes=classes, negative=negative, alpha=alpha)
             daily = trends.aggregate_predictions(tl, "D", classes, negative)
             esc = trends.detect_escalation(trends.ema(daily["neg_score"], alpha), tau=tau, k=k)
-            first = daily.index[esc.to_numpy()][0] if esc.any() else None
-            expected = bool(scen.get("expect_escalation", False))
+            if isinstance(esc, dict):
+                escalated = bool(esc.get("triggered", False))
+                first = esc.get("trigger_date")
+            else:
+                escalated = bool(esc.any())
+                first = daily.index[esc.to_numpy()][0] if escalated else None
+            expected = bool(scen.get("expect_escalation", q.get("escalation_true", False)))
             rows.append({"scenario": name, "user": u, "n_messages": len(tl), "n_days": len(daily),
-                         **q, "escalated": bool(esc.any()), "expected_escalation": expected,
-                         "escalation_correct": bool(esc.any()) == expected,
+                         **q, "escalated": escalated, "expected_escalation": expected,
+                         "escalation_correct": (escalated == expected),
                          "first_escalation_day": str(first) if first is not None else "",
                          "alpha": alpha, "tau": tau, "k_days": k, "model": final})
     out = pd.DataFrame(rows)
@@ -229,8 +237,8 @@ def cmd_latency(args, cfg) -> int:
         t = []
         for _ in range(20):
             t0 = time.perf_counter()
-            d = trends.aggregate_predictions(df, "D", classes, negative)
-            trends.ema(d["neg_score"], 0.3)
+            d = trends.aggregate(df, "daily")
+            trends.smooth_scores(d["neg_score"], 0.3)
             t.append((time.perf_counter() - t0) * 1000)
         agg_ms = statistics.median(t)
     except Exception as e:  # noqa: BLE001
@@ -294,7 +302,7 @@ def main(argv=None) -> int:
     p.add_argument("--scenarios", nargs="*")
 
     p = sub.add_parser("latency", help="inference + aggregation latency")
-    p.add_argument("--models", nargs="+", default=list(MODELS), choices=list(MODELS))
+    p.add_argument("--models", nargs="+", default=list(MODELS), choices=list(MODELS) + ["goemotions"])
     p.add_argument("--repeats", type=int, default=200)
     p.add_argument("--warmup", type=int, default=10)
 

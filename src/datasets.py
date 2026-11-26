@@ -182,19 +182,22 @@ def make_splits(df: pd.DataFrame, cfg: dict | None = None, overwrite: bool = Fal
     return {k: v.reset_index(drop=True) for k, v in splits.items()}
 
 
-def load_splits(cfg: dict | None = None, processed: bool = True) -> dict[str, pd.DataFrame]:
+def load_splits(cfg: dict | None = None, processed: bool = True, multilabel: bool = False) -> dict[str, pd.DataFrame]:
+    """Load train/val/test splits, preferring processed/ over raw splits/."""
     cfg = cfg or load_config()
     d_proc = path_from_cfg(cfg, "data_processed")
     d_splits = path_from_cfg(cfg, "data_splits")
     out = {}
+    suffix = "_multilabel" if multilabel else ""
     for s in ("train", "val", "test"):
-        f = d_proc / f"{s}.csv" if processed else d_splits / f"{s}.csv"
+        f = d_proc / f"{s}{suffix}.csv" if processed else d_splits / f"{s}{suffix}.csv"
         if not f.exists():
-            f = d_splits / f"{s}.csv"
+            f = d_splits / f"{s}{suffix}.csv"
             if not f.exists():
-                raise FileNotFoundError(f"{f} not found - run scripts/setup_data.py first")
+                flag = " --multilabel" if multilabel else ""
+                raise FileNotFoundError(f"{f} not found - run scripts/setup_data.py{flag} first")
         df = pd.read_csv(f)
-        if "label_id" not in df.columns and "label" in df.columns:
+        if not multilabel and "label_id" not in df.columns and "label" in df.columns:
             df["label_id"] = df["label"].map(LABEL2ID)
         out[s] = df
     return out
@@ -209,13 +212,27 @@ class TransformerDataset(Dataset):
     """Tokenises up-front without padding; pair with DataCollatorWithPadding for dynamic padding."""
 
     def __init__(self, df: pd.DataFrame, tokenizer, text_col: str = "text_transformer", max_len: int = 64):
-        enc = tokenizer(df[text_col].astype(str).tolist(), truncation=True, max_length=max_len)
-        labels = df["label_id"].astype(int).tolist()
+        col = text_col if text_col in df.columns else "text"
+        enc = tokenizer(df[col].astype(str).tolist(), truncation=True, max_length=max_len)
+        y_cols = [f"y_{c}" for c in LABELS]
+        is_multilabel = all(c in df.columns for c in y_cols)
+
         self.items = []
-        for i in range(len(labels)):
-            item = {k: enc[k][i] for k in enc.keys()}
-            item["labels"] = labels[i]
-            self.items.append(item)
+        if is_multilabel:
+            label_matrix = df[y_cols].to_numpy(dtype=np.float32)
+            for i in range(len(label_matrix)):
+                item = {k: enc[k][i] for k in enc.keys()}
+                item["labels"] = torch.tensor(label_matrix[i], dtype=torch.float)
+                self.items.append(item)
+        else:
+            if "label_id" not in df.columns and "label" in df.columns:
+                labels = df["label"].map(LABEL2ID).fillna(0).astype(int).tolist()
+            else:
+                labels = df.get("label_id", pd.Series(0, index=df.index)).astype(int).tolist()
+            for i in range(len(labels)):
+                item = {k: enc[k][i] for k in enc.keys()}
+                item["labels"] = labels[i]
+                self.items.append(item)
 
     def __len__(self):
         return len(self.items)

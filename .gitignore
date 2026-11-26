@@ -21,6 +21,7 @@ htmlcov/
 venv/
 env/
 ENV/
+fonts/
 
 # ---------- Secrets / local config ----------
 .env

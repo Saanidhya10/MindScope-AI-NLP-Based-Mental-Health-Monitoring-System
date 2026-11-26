@@ -157,7 +157,23 @@ def personal_baseline(df: pd.DataFrame, default_tau: float = 0.55) -> dict:
 
 
 # --------------------------------------------------------------------------- scripted timelines
-SCENARIOS = ["stable_positive", "drift_to_stress", "isolated_negative", "sustained_negative", "recovery"]
+SCENARIO_EXPECTATIONS = {
+    "stable_positive": False,
+    "drift_to_stress": True,
+    "isolated_negative": False,
+    "sustained_negative": True,
+    "recovery": False,
+}
+
+
+class ScenarioList(list):
+    """List of scenario names that also supports .items() returning (name, config_dict)."""
+
+    def items(self):
+        return [(s, {"name": s, "expect_escalation": SCENARIO_EXPECTATIONS.get(s, False)}) for s in self]
+
+
+SCENARIOS = ScenarioList(["stable_positive", "drift_to_stress", "isolated_negative", "sustained_negative", "recovery"])
 
 
 def _p_neg_curve(name: str, days: int) -> np.ndarray:
@@ -192,25 +208,80 @@ def _class_weights_for_day(p_neg: float) -> np.ndarray:
 def build_scripted_timeline(scenario: str, pool_df: pd.DataFrame, cfg: dict | None = None, seed: int = 0,
                             user_id: str | None = None, text_col: str = "text_transformer") -> pd.DataFrame:
     """Sample labelled messages (from the TEST split) in a scripted emotional order. Returns
-    user_id, timestamp, text, true_label."""
+    user_id, timestamp, text, true_label (and id if present in pool_df)."""
     cfg = cfg or load_config()
     sc = cfg["trends"]["simulation"]
     rng = np.random.default_rng(seed)
-    pools = {l: pool_df.loc[pool_df["label"] == l, text_col].astype(str).tolist() for l in LABELS}
+    if text_col not in pool_df.columns and "text" in pool_df.columns:
+        text_col = "text"
+    label_col = "label" if "label" in pool_df.columns else "true_label"
+    has_id = "id" in pool_df.columns
+
+    pools = {l: pool_df.loc[pool_df[label_col] == l] for l in LABELS}
     available = np.array([len(pools[l]) > 0 for l in LABELS])
-    start = pd.Timestamp(sc["start_date"])
-    lo, hi = sc["msgs_per_day"]
+    start = pd.Timestamp(sc.get("start_date", "2025-01-01"))
+    lo, hi = sc.get("msgs_per_day", [2, 5])
     rows = []
-    for day, p_neg in enumerate(_p_neg_curve(scenario, sc["days"])):
+    for day, p_neg in enumerate(_p_neg_curve(scenario, sc.get("days", 21))):
         w = _class_weights_for_day(float(p_neg)) * available
+        if w.sum() == 0:
+            continue
         w = w / w.sum()
         for _ in range(int(rng.integers(lo, hi + 1))):
             label = LABELS[int(rng.choice(NUM_CLASSES, p=w))]
-            text = pools[label][int(rng.integers(len(pools[label])))]
+            sub_pool = pools[label]
+            idx = int(rng.integers(len(sub_pool)))
+            row_item = sub_pool.iloc[idx]
+            text = str(row_item[text_col])
             ts = start + pd.Timedelta(days=day, hours=int(rng.integers(8, 22)), minutes=int(rng.integers(0, 60)))
-            rows.append({"user_id": user_id or f"sim_{scenario}_{seed}", "timestamp": ts, "text": text,
-                         "true_label": label})
+            entry = {"user_id": user_id or f"sim_{scenario}_{seed}", "timestamp": ts, "text": text,
+                     "true_label": label}
+            if has_id:
+                entry["id"] = row_item["id"]
+            rows.append(entry)
     return pd.DataFrame(rows)
+
+
+def simulate_timeline(pool_df: pd.DataFrame, scen: str | dict, start: str = "2025-01-01", seed: int = 0,
+                      user_id: str | None = None, classes=None, text_col: str = "text") -> pd.DataFrame:
+    """Backward-compatible alias for build_scripted_timeline."""
+    scenario = scen if isinstance(scen, str) else scen.get("name", "stable_positive")
+    cfg = load_config()
+    import copy
+    cfg_copy = copy.deepcopy(cfg)
+    cfg_copy.setdefault("trends", {}).setdefault("simulation", {})["start_date"] = start
+    return build_scripted_timeline(scenario, pool_df, cfg_copy, seed=seed, user_id=user_id, text_col=text_col)
+
+
+def aggregate_predictions(df: pd.DataFrame, freq: str = "D", classes=None, negative=None) -> pd.DataFrame:
+    """Backward-compatible alias for aggregate."""
+    freq_map = {"D": "daily", "W": "weekly", "MS": "monthly"}
+    freq_rule = freq_map.get(freq, freq)
+    return aggregate(df, freq=freq_rule)
+
+
+def ema(series, alpha: float = 0.3) -> pd.Series:
+    """Backward-compatible alias for smooth_scores."""
+    return smooth_scores(series, alpha)
+
+
+def trend_quality(pred_df: pd.DataFrame, classes=None, negative=None, alpha: float = 0.3,
+                  cfg: dict | None = None) -> dict:
+    """Backward-compatible evaluation wrapper returning both modern and legacy metrics."""
+    cfg = cfg or load_config()
+    if alpha is not None:
+        import copy
+        cfg = copy.deepcopy(cfg)
+        cfg.setdefault("trends", {})["alpha"] = alpha
+    q = evaluate_trend_quality(pred_df, cfg)
+    label_col = "true_label" if "true_label" in pred_df.columns else "label"
+    if "y_pred" in pred_df.columns and label_col in pred_df.columns:
+        q["message_accuracy"] = float((pred_df["y_pred"] == pred_df[label_col]).mean())
+    else:
+        q["message_accuracy"] = float("nan")
+    q["neg_corr"] = q.get("neg_score_corr", float("nan"))
+    q["neg_mae"] = q.get("neg_score_mae", float("nan"))
+    return q
 
 
 # --------------------------------------------------------------------------- trend-quality evaluation

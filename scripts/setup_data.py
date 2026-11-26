@@ -111,25 +111,46 @@ def load_goemotions(raw_dir: Path, hf_id: str) -> tuple[pd.DataFrame, list[str]]
     return df, list(names)
 
 
-def map_goemotions(df: pd.DataFrame, names: list[str], mapping: dict[str, list[str]]) -> pd.DataFrame:
-    """27 -> 8. Keep a comment only if all its labels fall in ONE target class; drop ambiguous ones."""
+def map_goemotions(df: pd.DataFrame, names: list[str], mapping: dict[str, list[str]],
+                   multilabel: bool = False, classes: list[str] | None = None) -> pd.DataFrame:
+    """Map GoEmotions labels to target taxonomy. If multilabel=False, drop multi-class comments;
+    if multilabel=True, preserve multi-hot binary vectors for all matching target classes."""
     src2tgt = {src: tgt for tgt, srcs in mapping.items() for src in srcs}
     unmapped = [n for n in names if n not in src2tgt]
     if unmapped:
         log.warning("GoEmotions labels without mapping (rows dropped): %s", unmapped)
 
-    def to_class(ids):
-        tg = {src2tgt.get(names[i]) for i in ids}
-        return next(iter(tg)) if len(tg) == 1 and None not in tg else None
-
     out = df.copy()
-    out["label"] = out["label_ids"].apply(to_class)
-    n0 = len(out)
-    out = out.dropna(subset=["label"])
-    log.info("GoEmotions: kept %d / %d comments after single-class mapping", len(out), n0)
+    if not multilabel:
+        def to_class(ids):
+            tg = {src2tgt.get(names[i]) for i in ids}
+            return next(iter(tg)) if len(tg) == 1 and None not in tg else None
+
+        out["label"] = out["label_ids"].apply(to_class)
+        n0 = len(out)
+        out = out.dropna(subset=["label"])
+        log.info("GoEmotions: kept %d / %d comments after single-class mapping", len(out), n0)
+    else:
+        classes = classes or DEFAULT_CLASSES
+
+        def to_classes(ids):
+            tg = {src2tgt[names[i]] for i in ids if names[i] in src2tgt}
+            return sorted(tg) if tg else None
+
+        out["target_classes"] = out["label_ids"].apply(to_classes)
+        n0 = len(out)
+        out = out.dropna(subset=["target_classes"])
+        out["label"] = out["target_classes"].apply(lambda cs: "|".join(cs))
+        for c in classes:
+            out[f"y_{c}"] = out["target_classes"].apply(lambda cs: int(c in cs))
+        log.info("GoEmotions (multi-label): kept %d / %d comments with at least 1 target class", len(out), n0)
+
     out["source"] = "goemotions"
     out["id"] = "go-" + out["id"].astype(str)
-    return out[["id", "text", "label", "source"]]
+    ret_cols = ["id", "text", "label", "source"]
+    if multilabel and classes:
+        ret_cols += [f"y_{c}" for c in classes]
+    return out[ret_cols]
 
 
 def _read_dreaddit_csvs(files: list[Path]) -> pd.DataFrame:
@@ -171,7 +192,8 @@ def load_dreaddit(raw_dir: Path, local_path: Path | None, url: str) -> pd.DataFr
     )
 
 
-def map_dreaddit(df: pd.DataFrame, max_words: int) -> pd.DataFrame:
+def map_dreaddit(df: pd.DataFrame, max_words: int, multilabel: bool = False,
+                 classes: list[str] | None = None) -> pd.DataFrame:
     """Stressed posts -> Stress. Not-stressed posts are DROPPED (not-stressed != Neutral)."""
     df = df[df["label"] == 1].copy()
     df["text"] = df["text"].astype(str).str.split().str[:max_words].str.join(" ")
@@ -179,8 +201,15 @@ def map_dreaddit(df: pd.DataFrame, max_words: int) -> pd.DataFrame:
     df["id"] = "dd-" + (df[idcol].astype(str) if idcol else df.index.astype(str))
     df["label"] = "Stress"
     df["source"] = "dreaddit"
+    if multilabel:
+        classes = classes or DEFAULT_CLASSES
+        for c in classes:
+            df[f"y_{c}"] = int(c == "Stress")
     log.info("Dreaddit: %d stressed posts (truncated to %d words)", len(df), max_words)
-    return df[["id", "text", "label", "source"]]
+    ret_cols = ["id", "text", "label", "source"]
+    if multilabel and classes:
+        ret_cols += [f"y_{c}" for c in classes]
+    return df[ret_cols]
 
 
 def sample_sentiment140(path: Path, n: int, seed: int, out: Path) -> None:
@@ -208,19 +237,36 @@ _SYN_PRIOR = dict(zip(DEFAULT_CLASSES, [0.30, 0.10, 0.10, 0.03, 0.03, 0.03, 0.06
 _FILLER = "i the a to it was just so really this that and my we they about with for".split()
 
 
-def make_synthetic(n: int, seed: int) -> pd.DataFrame:
+def make_synthetic(n: int, seed: int, multilabel: bool = False, classes: list[str] | None = None) -> pd.DataFrame:
     """Toy imbalanced data with weak class signal. FOR PIPELINE TESTING ONLY."""
+    classes = classes or DEFAULT_CLASSES
     rng = np.random.default_rng(seed)
-    labels = rng.choice(list(_SYN_PRIOR), size=n, p=list(_SYN_PRIOR.values()))
-    rows = []
-    for i, lab in enumerate(labels):
-        k = rng.integers(1, 3)
-        sig = list(rng.choice(_SYN_VOCAB[lab], size=k))
-        other = rng.choice(_SYN_VOCAB[rng.choice(list(_SYN_VOCAB))], size=1)  # label noise word
-        words = sig + list(other) + list(rng.choice(_FILLER, size=rng.integers(3, 9)))
-        rng.shuffle(words)
-        rows.append((f"syn-{i}", " ".join(words), lab, "synthetic"))
-    return pd.DataFrame(rows, columns=["id", "text", "label", "source"])
+    if not multilabel:
+        labels = rng.choice(list(_SYN_PRIOR), size=n, p=list(_SYN_PRIOR.values()))
+        rows = []
+        for i, lab in enumerate(labels):
+            k = rng.integers(1, 3)
+            sig = list(rng.choice(_SYN_VOCAB[lab], size=k))
+            other = rng.choice(_SYN_VOCAB[rng.choice(list(_SYN_VOCAB))], size=1)  # label noise word
+            words = sig + list(other) + list(rng.choice(_FILLER, size=rng.integers(3, 9)))
+            rng.shuffle(words)
+            rows.append((f"syn-{i}", " ".join(words), lab, "synthetic"))
+        return pd.DataFrame(rows, columns=["id", "text", "label", "source"])
+    else:
+        rows = []
+        for i in range(n):
+            k_labels = int(rng.choice([1, 2, 3], p=[0.6, 0.3, 0.1]))
+            chosen = sorted(list(rng.choice(classes, size=k_labels, replace=False, p=list(_SYN_PRIOR.values()))))
+            words = []
+            for lab in chosen:
+                words += list(rng.choice(_SYN_VOCAB[lab], size=rng.integers(1, 3)))
+            words += list(rng.choice(_FILLER, size=rng.integers(3, 8)))
+            rng.shuffle(words)
+            row = {"id": f"syn-{i}", "text": " ".join(words), "label": "|".join(chosen), "source": "synthetic"}
+            for c in classes:
+                row[f"y_{c}"] = int(c in chosen)
+            rows.append(row)
+        return pd.DataFrame(rows)
 
 
 # ----------------------------------------------------------------------------- splits
@@ -243,9 +289,20 @@ def clean_and_dedupe(df: pd.DataFrame) -> pd.DataFrame:
 def stratified_split(df: pd.DataFrame, val: float, test: float, seed: int):
     from sklearn.model_selection import train_test_split
 
-    train_val, te = train_test_split(df, test_size=test, stratify=df["label"], random_state=seed)
+    strat = df["label"]
+    if strat.value_counts().min() < 2:
+        strat = strat.apply(lambda s: str(s).split("|")[0])
+    if strat.value_counts().min() < 2:
+        strat = None
+
+    train_val, te = train_test_split(df, test_size=test, stratify=strat, random_state=seed)
+    strat_tv = train_val["label"] if strat is not None else None
+    if strat_tv is not None and strat_tv.value_counts().min() < 2:
+        strat_tv = strat_tv.apply(lambda s: str(s).split("|")[0])
+    if strat_tv is not None and strat_tv.value_counts().min() < 2:
+        strat_tv = None
     tr, va = train_test_split(train_val, test_size=val / (1 - test),
-                              stratify=train_val["label"], random_state=seed)
+                              stratify=strat_tv, random_state=seed)
     return tr.reset_index(drop=True), va.reset_index(drop=True), te.reset_index(drop=True)
 
 
@@ -337,6 +394,7 @@ def main(argv=None) -> int:
     ap.add_argument("--synthetic", type=int, metavar="N", help="generate N toy rows instead of downloading")
     ap.add_argument("--subset", type=int, help="keep only N rows (stratified) for fast debugging")
     ap.add_argument("--skip-preprocess", action="store_true")
+    ap.add_argument("--multilabel", action="store_true", help="build multi-label dataset (Improvement 7)")
     ap.add_argument("--verify", action="store_true", help="only check frozen splits against the manifest")
     ap.add_argument("--force", action="store_true", help="rebuild splits even if frozen (changes the test set)")
     args = ap.parse_args(argv)
@@ -360,31 +418,35 @@ def main(argv=None) -> int:
     for d in (raw, interim, processed, splits_dir, figs, reports):
         d.mkdir(parents=True, exist_ok=True)
 
+    manifest_file = splits_dir / ("split_manifest_multilabel.json" if args.multilabel else "split_manifest.json")
+    suffix = "_multilabel" if args.multilabel else ""
+
     if args.verify:
         return 0 if verify_splits(splits_dir) else 1
 
-    if (splits_dir / "split_manifest.json").exists() and not args.force:
-        log.error("Splits are frozen (%s). Use --verify to check them or --force to rebuild.", splits_dir)
+    if manifest_file.exists() and not args.force:
+        log.error("Splits are frozen (%s). Use --verify to check them or --force to rebuild.", manifest_file)
         return 1
 
     # 1-3. load + map
     if args.synthetic:
         log.warning("SYNTHETIC DATA - for pipeline testing only; never report these numbers.")
-        unified = make_synthetic(args.synthetic, seed)
+        unified = make_synthetic(args.synthetic, seed, multilabel=args.multilabel, classes=classes)
     else:
         go_raw, names = load_goemotions(raw, cfg_get(cfg, "data.goemotions_hf_id",
                                                      "google-research-datasets/go_emotions"))
-        go = map_goemotions(go_raw, names, mapping)
+        go = map_goemotions(go_raw, names, mapping, multilabel=args.multilabel, classes=classes)
         dd = map_dreaddit(load_dreaddit(raw, args.dreaddit_path, cfg_get(cfg, "data.dreaddit_url", DREADDIT_URL)),
-                          max_words)
+                          max_words, multilabel=args.multilabel, classes=classes)
         unified = pd.concat([go, dd], ignore_index=True)
         if args.sentiment140_path:
             sample_sentiment140(args.sentiment140_path, args.sentiment140_n, seed,
                                 interim / "sentiment140_sample.csv")
 
-    unknown = set(unified["label"]) - set(classes)
-    if unknown:
-        raise SystemExit(f"Labels outside configured classes: {unknown}")
+    if not args.multilabel:
+        unknown = set(unified["label"]) - set(classes)
+        if unknown:
+            raise SystemExit(f"Labels outside configured classes: {unknown}")
 
     # 4. clean, optionally subset, split ONCE
     unified = clean_and_dedupe(unified)
@@ -393,15 +455,28 @@ def main(argv=None) -> int:
         unified = pd.concat([g.sample(min(len(g), max(10, int(round(len(g) * frac)))), random_state=seed)
                              for _, g in unified.groupby("label")]).reset_index(drop=True)
         log.info("Debug subset: %d rows", len(unified))
-    unified.to_csv(interim / "unified.csv", index=False)
+    unified.to_csv(interim / f"unified{suffix}.csv", index=False)
     tr, va, te = stratified_split(unified, val_frac, test_frac, seed)
     splits = {"train": tr, "val": va, "test": te}
     for name, d in splits.items():
-        d.to_csv(splits_dir / f"{name}.csv", index=False)
-    write_manifest(splits_dir, splits, classes, seed, {"val": val_frac, "test": test_frac})
-    log.info("Wrote frozen splits to %s (train %d / val %d / test %d)", splits_dir, len(tr), len(va), len(te))
+        d.to_csv(splits_dir / f"{name}{suffix}.csv", index=False)
+    
+    if not args.multilabel:
+        write_manifest(splits_dir, splits, classes, seed, {"val": val_frac, "test": test_frac})
+        report_distribution(splits, classes, unified, figs, reports)
+    else:
+        log.info("Wrote multi-label splits: train %d / val %d / test %d", len(tr), len(va), len(te))
+        manifest = {
+            "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "seed": seed,
+            "multilabel": True,
+            "classes": classes,
+            "files": {name: {"rows": len(d), "sha256": sha256(splits_dir / f"{name}{suffix}.csv")}
+                      for name, d in splits.items()}
+        }
+        manifest_file.write_text(json.dumps(manifest, indent=2))
 
-    report_distribution(splits, classes, unified, figs, reports)
+    log.info("Wrote splits to %s", splits_dir)
 
     # 6. preprocessing hook (src/preprocess.py)
     if not args.skip_preprocess:
@@ -411,7 +486,7 @@ def main(argv=None) -> int:
             log.warning("src.preprocess.preprocess_dataframe not importable (%s) - skipping processed/", e)
         else:
             for name, d in splits.items():
-                preprocess_dataframe(d, text_col="text").to_csv(processed / f"{name}.csv", index=False)
+                preprocess_dataframe(d, text_col="text").to_csv(processed / f"{name}{suffix}.csv", index=False)
             log.info("Wrote preprocessed splits to %s", processed)
     return 0
 

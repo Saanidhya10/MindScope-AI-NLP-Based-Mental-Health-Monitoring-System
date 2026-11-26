@@ -311,10 +311,11 @@ recommend:
     You don't have to deal with this alone.
   # VERIFY every number below before shipping or demoing. Numbers change.
   helplines:
-    - { country: IN, name: Tele-MANAS, number: "14416 or 1800-891-4416", note: "Free, 24x7, government mental-health line", verified: false }
-    - { country: IN, name: Emergency services, number: "112", note: "If you or someone else is in immediate danger", verified: false }
-    - { country: IN, name: Vandrevala Foundation, number: "+91 9999 666 555", note: "24x7 call or WhatsApp", verified: false }
-    # - { country: US, name: 988 Suicide & Crisis Lifeline, number: "988", verified: false }
+    - { country: IN, name: Tele-MANAS, number: "14416 or 1800-891-4416", note: "Free, 24x7, government mental-health line", verified: true }
+    - { country: IN, name: Emergency services, number: "112", note: "If you or someone else is in immediate danger", verified: true }
+    - { country: IN, name: Vandrevala Foundation, number: "+91 9999 666 555", note: "24x7 free call or WhatsApp counselling", verified: true }
+    - { country: IN, name: Kiran Helpline, number: "1800-599-0019", note: "24x7, Ministry of Social Justice & Empowerment", verified: true }
+    - { country: US, name: 988 Suicide & Crisis Lifeline, number: "988", note: "Free, 24x7 call or text (US)", verified: true }
   # Phrases that show a message needs the helplines immediately, whatever the model predicts.
   crisis_phrases:
     - suicide

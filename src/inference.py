@@ -35,9 +35,37 @@ class EmotionPredictor:
         self._load()
 
     @classmethod
-    def from_config(cls, cfg: dict | None = None, **kw) -> "EmotionPredictor":
+    def from_config(cls, cfg: dict | None = None, model: str | None = None, **kw) -> "EmotionPredictor":
         cfg = cfg or load_config()
+        kw.pop("model", None)
         ic = cfg.get("inference", {})
+
+        if model:
+            model_key = model.lower()
+            if model_key in ("lr", "logreg"):
+                for p in ["models/classical/logreg_baseline/pipeline.joblib", "models/classical/logreg_baseline"]:
+                    cand = resolve_path(p)
+                    if cand.exists():
+                        return cls("classical", cand, cfg, **kw)
+            elif model_key == "svm":
+                for p in ["models/classical/svm_baseline/pipeline.joblib", "models/classical/svm_baseline"]:
+                    cand = resolve_path(p)
+                    if cand.exists():
+                        return cls("classical", cand, cfg, **kw)
+            elif model_key == "rf":
+                for p in ["models/classical/rf_baseline/pipeline.joblib", "models/classical/rf_baseline"]:
+                    cand = resolve_path(p)
+                    if cand.exists():
+                        return cls("classical", cand, cfg, **kw)
+            elif model_key in ("distilbert", "roberta"):
+                for sub in ["final", "baseline_seed42"]:
+                    p = resolve_path(f"models/{model_key}/{sub}")
+                    if (p / "config.json").exists():
+                        return cls("transformer", p, cfg, **kw)
+            elif model_key == "goemotions":
+                if "path" in ic:
+                    return cls("goemotions", ic["path"], cfg, **kw)
+
         if "kind" in ic and "path" in ic:
             try:
                 return cls(ic["kind"], ic["path"], cfg, **kw)

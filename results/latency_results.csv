@@ -1,1 +1,2 @@
-model,device,ms_per_text,note
+model,device,n,mean_ms,median_ms,p95_ms,aggregation_ms,end_to_end_ms
+goemotions,cpu,2,66.17684988304973,66.17684988304973,68.24100017547607,8.96179978735745,75.13864967040718
