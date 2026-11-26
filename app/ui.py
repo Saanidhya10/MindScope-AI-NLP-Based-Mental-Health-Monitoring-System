@@ -107,6 +107,9 @@ _CSS = """
 .stApp .mj-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.9rem; font-size: 0.9rem; color: var(--muted); }
 .stApp .mj-legend i { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 2px; margin-right: 0.4rem; vertical-align: -1px; }
 
+.stApp .mj-insights { margin: 0 0 1rem; padding: 0; list-style: none; max-width: 62ch; }
+.stApp .mj-insights li { padding: 0.6rem 0 0.6rem 0.9rem; border-left: 3px solid var(--lake); margin-bottom: 0.5rem;
+  background: var(--surface); line-height: 1.5; }
 .stApp .mj-footer { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin-top: 3.5rem; padding-top: 1rem;
   border-top: 1px solid var(--rule); max-width: 80ch; }
 
@@ -318,6 +321,27 @@ def trend_chart(hist: pd.DataFrame, daily: pd.DataFrame, view: str, baseline: di
     fig.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="#DDE4E2", zeroline=False, tickfont=dict(color=MUTED))
     fig.update_xaxes(showgrid=False, tickformat="%d %b", tickfont=dict(color=MUTED), linecolor=RULE)
     st.plotly_chart(_layout(fig, 290), use_container_width=True, config={"displayModeBar": False})
+
+
+def insight_list(items: list[str]) -> None:
+    _md('<ul class="mj-insights">' + "".join(f"<li>{escape(t)}</li>" for t in items) + "</ul>")
+
+
+def checkin_chart(df: pd.DataFrame) -> None:
+    """Mood, energy and stress (1-10) with sleep hours, for recent check-ins."""
+    fig = go.Figure()
+    for col, name, color, dash in [("mood", "Mood", LAKE, "solid"), ("energy", "Energy", "#4FAE9F", "solid"),
+                                   ("stress", "Stress", LEVEL_COLORS["support"], "dot"),
+                                   ("sleep_hours", "Sleep (h)", "#9FB0B4", "dash")]:
+        if col in df:
+            fig.add_trace(go.Scatter(x=df.index, y=df[col], name=name, mode="lines+markers",
+                                     line=dict(color=color, width=2, dash=dash), marker=dict(size=5),
+                                     hovertemplate=f"%{{x|%d %b}}: {name} %{{y}}<extra></extra>"))
+    fig.update_yaxes(range=[0, 11], gridcolor="#DDE4E2", zeroline=False, tickfont=dict(color=MUTED))
+    fig.update_xaxes(showgrid=False, tickformat="%d %b", tickfont=dict(color=MUTED), linecolor=RULE)
+    fig = _layout(fig, 280)
+    fig.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.2, x=0, font=dict(color=MUTED)))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 def footer(model_label: str) -> None:

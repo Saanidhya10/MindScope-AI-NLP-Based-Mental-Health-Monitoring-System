@@ -26,6 +26,7 @@ VIEWS = Path(__file__).parent / "views"
 pages = {
     "": [st.Page(VIEWS / "home.py", title="Home", icon=":material/home:", default=True),
          st.Page(VIEWS / "journal.py", title="Journal", icon=":material/edit_note:")],
+    "Track": [st.Page(VIEWS / "checkin.py", title="Daily check-in", icon=":material/fact_check:")],
     "Account": [st.Page(VIEWS / "settings.py", title="Settings & privacy", icon=":material/shield_person:")],
 }
 st.navigation(pages).run()

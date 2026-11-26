@@ -33,7 +33,32 @@ CREATE TABLE IF NOT EXISTS predictions (
     text TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_pred_user_time ON predictions(user_id, timestamp);
+CREATE TABLE IF NOT EXISTS checkins (          -- daily self-reported wellness check-in
+    user_id TEXT NOT NULL, day TEXT NOT NULL,
+    sleep_hours REAL, activity_min REAL, screen_hours REAL, social INTEGER,
+    workload INTEGER, energy INTEGER, mood INTEGER, stress INTEGER,
+    PRIMARY KEY (user_id, day)
+);
+CREATE TABLE IF NOT EXISTS activity_log (      -- completed wellness activities and how they felt
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, timestamp TEXT NOT NULL,
+    activity TEXT NOT NULL, mood_before INTEGER, mood_after INTEGER, helpful INTEGER
+);
+CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, created TEXT NOT NULL,
+    title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS notes (             -- gratitude / thought journals: only with explicit opt-in
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, timestamp TEXT NOT NULL,
+    kind TEXT NOT NULL, body TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS forecasts (         -- saved outlooks, compared later with what actually happened
+    user_id TEXT NOT NULL, made_on TEXT NOT NULL, target_day TEXT NOT NULL,
+    predicted REAL NOT NULL, low REAL NOT NULL, high REAL NOT NULL,
+    PRIMARY KEY (user_id, made_on, target_day)
+);
 """
+USER_TABLES = ["predictions", "checkins", "activity_log", "goals", "notes", "forecasts"]
+CHECKIN_FIELDS = ["sleep_hours", "activity_min", "screen_hours", "social", "workload", "energy", "mood", "stress"]
 
 
 def _now() -> str:
@@ -51,6 +76,9 @@ class MoodDatabase:
         self._memory_conn = sqlite3.connect(":memory:") if str(path) == ":memory:" else None
         with self._conn() as c:
             c.executescript(SCHEMA)
+            cols = {r[1] for r in c.execute("PRAGMA table_info(predictions)")}
+            if "triggers" not in cols:  # added after the first release: detected trigger categories (JSON list)
+                c.execute("ALTER TABLE predictions ADD COLUMN triggers TEXT")
 
     @contextmanager
     def _conn(self):
@@ -122,10 +150,29 @@ class MoodDatabase:
     def delete_user_data(self, user_id: str, keep_user: bool = False) -> int:
         with self._conn() as c:
             n = c.execute("DELETE FROM predictions WHERE user_id=?", (user_id,)).rowcount
+            for table in USER_TABLES[1:]:
+                c.execute(f"DELETE FROM {table} WHERE user_id=?", (user_id,))
             if not keep_user:
                 c.execute("DELETE FROM consent WHERE user_id=?", (user_id,))
                 c.execute("DELETE FROM users WHERE user_id=?", (user_id,))
         return n
+
+    # ---- daily check-ins ---------------------------------------------------------
+    def save_checkin(self, user_id: str, day, values: dict) -> None:
+        """Insert or replace one day's check-in. Raises PermissionError without consent."""
+        if not self.has_consent(user_id):
+            raise PermissionError(f"User '{user_id}' has not granted consent; nothing was stored.")
+        row = [values.get(f) for f in CHECKIN_FIELDS]
+        with self._conn() as c:
+            c.execute(f"INSERT OR REPLACE INTO checkins (user_id, day, {', '.join(CHECKIN_FIELDS)}) "
+                      f"VALUES (?, ?, {', '.join('?' * len(CHECKIN_FIELDS))})",
+                      [user_id, pd.Timestamp(day).date().isoformat(), *row])
+
+    def get_checkins(self, user_id: str) -> pd.DataFrame:
+        with self._conn() as c:
+            df = pd.read_sql("SELECT * FROM checkins WHERE user_id=? ORDER BY day", c, params=(user_id,))
+        df["day"] = pd.to_datetime(df["day"])
+        return df.drop(columns=["user_id"]).set_index("day")
 
     def list_users(self) -> list[str]:
         with self._conn() as c:
