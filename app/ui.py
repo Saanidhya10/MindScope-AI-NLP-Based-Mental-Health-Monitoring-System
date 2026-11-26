@@ -53,6 +53,10 @@ _CSS = """
 /* ---- type ---- */
 .stApp .mj-title { font-family: var(--serif) !important; font-weight: 600; font-size: clamp(2.25rem, 4.2vw, 3rem);
   line-height: 1.1; letter-spacing: -0.012em; color: var(--ink); margin: 0 0 0.6rem; }
+.stApp .mj-tagline { font-family: var(--serif) !important; font-size: 1.2rem; font-style: italic; color: var(--ink);
+  margin: -0.2rem 0 0.9rem; max-width: 60ch; }
+.stApp .mj-page-title { font-family: var(--serif) !important; font-weight: 600; font-size: 2.1rem; line-height: 1.15;
+  color: var(--ink); margin: 0 0 0.5rem; }
 .stApp .mj-lede { font-size: 1.125rem; line-height: 1.55; color: var(--muted); max-width: 60ch; margin: 0 0 1.25rem; }
 .stApp .mj-help { border-left: 3px solid var(--lake); padding: 0.2rem 0 0.2rem 0.9rem; font-size: 0.95rem;
   line-height: 1.5; color: var(--ink); max-width: 72ch; margin: 0; }
@@ -124,16 +128,31 @@ def inject_css() -> None:
     _md(_CSS)
 
 
-def header(helplines: list[dict]) -> None:
+def help_line(helplines: list[dict]) -> None:
     first = helplines[0] if helplines else {"name": "Tele-MANAS", "number": "14416"}
-    _md(
-        '<p class="mj-title" role="heading" aria-level="1">Mood Journal</p>'
-        '<p class="mj-lede">Write a few lines about your day. The app picks out the feelings in what you write '
-        "and shows how they change over the weeks.</p>"
-        f'<p class="mj-help">This is not a medical tool and it can be wrong. If you need to talk to someone now, '
+    _md(f'<p class="mj-help">This is not a medical tool and it can be wrong. If you need to talk to someone now, '
         f'call {escape(first["name"])} on <strong class="mj-num">{escape(first["number"])}</strong>, '
-        "free and open day and night.</p>"
-    )
+        "free and open day and night.</p>")
+
+
+def brand_header(helplines: list[dict]) -> None:
+    """Home page masthead: product name, what it is, and the helpline."""
+    from common import APP_NAME, APP_TAGLINE
+
+    _md(f'<p class="mj-title" role="heading" aria-level="1">{APP_NAME}</p>'
+        f'<p class="mj-tagline">{APP_TAGLINE}</p>'
+        '<p class="mj-lede">Write or speak a few lines each day. MindScope picks out the feelings in what you share, '
+        "learns what is usual for you, and shows how things change over the weeks.</p>")
+    help_line(helplines)
+
+
+def page_header(title: str, lede: str | None = None) -> None:
+    _md(f'<p class="mj-page-title" role="heading" aria-level="1">{escape(title)}</p>'
+        + (f'<p class="mj-lede">{lede}</p>' if lede else ""))
+
+
+def empty_state(text: str) -> None:
+    _md(f'<p class="mj-empty">{text}</p>')
 
 
 def section(title: str, note: str | None = None) -> None:
@@ -302,6 +321,6 @@ def trend_chart(hist: pd.DataFrame, daily: pd.DataFrame, view: str, baseline: di
 
 
 def footer(model_label: str) -> None:
-    _md(f'<p class="mj-footer">Emotions are estimated from your words by the {escape(model_label)} model, trained on '
-        "English Reddit comments. It often misreads short, sarcastic or mixed entries, and it cannot diagnose "
+    _md(f'<p class="mj-footer">MindScope AI estimates emotions from your words with the {escape(model_label)} model, '
+        "trained on English Reddit comments. It often misreads short, sarcastic or mixed entries, and it cannot diagnose "
         "anything. Only the scores and the time of each entry are saved, on this computer.</p>")

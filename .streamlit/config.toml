@@ -1,4 +1,4 @@
-# Theme for the Mood Journal dashboard (app/ui.py adds the typefaces and layout on top).
+# Theme for MindScope AI (app/ui.py adds the typefaces and layout on top).
 [theme]
 base = "light"
 primaryColor = "#2D5F73"

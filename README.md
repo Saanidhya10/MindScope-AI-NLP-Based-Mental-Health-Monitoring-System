@@ -1,4 +1,6 @@
-# NLP-Based Mental Health Monitoring System
+# MindScope AI
+
+**An Intelligent Personal Emotional Wellness and Monitoring Platform** (repository: NLP-Based Mental Health Monitoring System)
 
 An end-to-end NLP framework that classifies user-written text into **fine-grained emotions**, tracks how those emotions **change over time**, and responds with **supportive, non-diagnostic** suggestions.
 
@@ -220,10 +222,10 @@ The complete **Minor Project Report (66 pages)** is maintained in the [`report/`
 
 ---
 
-## Dashboard
+## The MindScope AI app
 
-Built with **Streamlit** (`streamlit run app/app.py` from the repo root). The app is a thin layer over `src/`
-(inference, database, trends, recommend); `app/ui.py` only draws.
+A multi-page **Streamlit** app (`streamlit run app/app.py` from the repo root). Each page lives in `app/views/`;
+`app/common.py` holds the shared config, database and models, and `app/ui.py` only draws. All logic is in `src/`.
 
 - **Today's entry**: write a few lines; the model shows the feelings it found, strongest first, with a plain-language
   note on how sure it is. Messages that mention self-harm show helplines immediately, whatever the model predicts.
